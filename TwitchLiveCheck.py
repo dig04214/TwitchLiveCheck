@@ -10,7 +10,19 @@ import getopt
 
 class TwitchRecorder:
   def __init__(self) -> None:
-      pass
+      self.streamerID = ""
+      self.quality = "1080p60"
+      self.refresh = 1.0
+      self.check = 30
+      self.root_path = ""
+
+
+      self.client_id = ""
+      self.user_token = ""
+
+  def run(self) -> None:
+    self.download_path = os.join()
+
 
 
 
