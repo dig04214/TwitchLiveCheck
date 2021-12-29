@@ -1,12 +1,12 @@
-from typing import Tuple
 import requests
 import os
 import time
-import json
+# import json
 import sys
 import subprocess
 import datetime
 import getopt
+import atexit
 
 
 class TwitchLiveCheck:
@@ -26,11 +26,15 @@ class TwitchLiveCheck:
     self.user_token = self.create_token()
     self.login_name = self.streamerID.replace(',', '').split(' ')
     self.download_path = {}
+    self.procs = {}
+    atexit.register(self.revoke_token())
+    atexit.register(self.terminate_proc())
     for id in self.login_name:
       self.download_path[id] = os.path.join(self.root_path, id)
       if(os.path.isdir(self.download_path[id]) is False):
         os.makedirs(self.download_path[id])
 
+    self.url_params = self.create_params(self.login_name)
     print("Checking for", self.login_name, "every", self.refresh, "seconds. Record with", self.quality, "quality.")
     self.loop_check()
 
@@ -50,7 +54,7 @@ class TwitchLiveCheck:
 
   def validate_token(self) -> None:
     api = 'https://id.twitch.tv/oauth2/validate'
-    h = f'Authorization: Bearer {self.user_token}'
+    h = {'Authorization': f'Bearer {self.user_token}'}
     res = requests.get(api, headers=h)
     if res.status_code != requests.codes.ok:
       self.user_token = self.create_token()
@@ -62,10 +66,8 @@ class TwitchLiveCheck:
       'token': self.user_token
     }
     res = requests.post(api, data=payload)
-    res.raise_for_status()
 
-
-  def create_params(username) -> str:
+  def create_params(self, username) -> str:
     params = ''
     for id in username:
       params = params + f'&user_login={id}'
@@ -76,8 +78,7 @@ class TwitchLiveCheck:
 
   def check_live(self) -> tuple:
     self.validate_token()
-    self.url_params = self.create_params(self.login_name)
-    api = 'https://api.twitch.tv/helix/streams' + self.url_params
+    api = 'https://api.twitch.tv/helix/streams?' + self.url_params
     h = {'Authorization': f'Bearer {self.user_token}', 'Client-Id': self.client_id}
     info = {}
     status = False
@@ -88,11 +89,13 @@ class TwitchLiveCheck:
         status, info = False, {}
       else:
         for i in res.json()['data']:
-          info[i['user_login']] = i['title']
+          info[i['user_login']] = {'title': i['title'], 'game': i['game_name']}
           self.login_name.remove(i['user_login'])
+        self.url_params = self.create_params(self.login_name)
         status = True
 
     except (KeyboardInterrupt, SystemExit):
+      self.terminate_proc()
       self.revoke_token()
       raise
 
@@ -101,10 +104,44 @@ class TwitchLiveCheck:
   def loop_check(self) -> None:
     while True:
       status, info = self.check_live()
-      info.keys()
+      if status is True:
+        for id in info:
+          print(id + 'is online. Stream recording in session.')
+          title = info[id] if info[id]['title'] != '' else 'Untitled'
+          game = info[id] if info[id]['game'] != '' else 'Unknown'
+          filename = id + ' - ' + datetime.datetime.now().strftime("%Y%m%d %Hh%Mm%Ss") + '_' + title + '_' + game + '.ts'
+          file_path = os.path.join(self.download_path[id], filename)
+          self.procs[id] = subprocess.Popen(['streamlink', "--stream-segment-threads", "5", "--stream-segment-attempts" , "5", "--twitch-disable-hosting", "--twitch-disable-ads", 'www.twitch.tv/', id, self.quality, "-o", file_path])
+        # 화질 체크 반복 기능 필요
+        self.check_process()
+      else:
+        self.check_process()
+      time.sleep(self.refresh)
 
+  def check_process(self) -> None:
+    id_status = False
+    if len(self.procs) > 0:
+      for id in self.procs:
+        proc_code = self.procs[id].poll()
+        if proc_code == None:
+          print(id + "is still recording")
+        elif proc_code == 0:
+          print(id + "is still recording")
+        else:
+          print(id + " stream is done. Go back checking...")
+          self.login_name.append(id)
+          id_status = True
+    if id_status is True:
+      self.url_params = self.create_params(self.login_name)
+      id_status = False
+
+  def terminate_proc(self) -> None:
+    if len(self.procs) > 0:
+      for id in self.procs:
+        self.procs[id].terminate()
 
   def __del__(self) -> None:
+    self.terminate_proc()
     self.revoke_token()
     
 def main(argv):

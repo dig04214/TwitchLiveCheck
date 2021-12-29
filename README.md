@@ -8,6 +8,6 @@
 
 
 ## requirement:
-> python
-> twtich developers에서 등록한 client ID, client secret
-> streamlink
+> python   
+> twtich developers에서 등록한 client ID, client secret   
+> streamlink   
