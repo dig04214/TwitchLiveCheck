@@ -12,6 +12,7 @@
 
 미구현 기능   
 * 화질 탐색 반복 기능
+* argv 기능
 
 ## requirement:
 > python   
