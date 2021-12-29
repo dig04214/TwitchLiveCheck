@@ -12,7 +12,7 @@ import atexit
 class TwitchLiveCheck:
   def __init__(self) -> None:
     self.streamerID = ""   # 스트리머 ID, 띄어쓰기로 구분
-    self.quality = "1080p60"   # 화질 설정, 1080p60, 1080p, best 중 하나 추천
+    self.quality = "best"   # 화질 설정, 1080p60, 1080p, best 중 하나 추천
     self.refresh = 1.0   # 탐색 간격(초) 설정, 0.5이하의 값 금지
     self.check = 30   # 화질 탐색 횟수 설정, 탐색 횟수 이상으로 설정된 화질 없으면 best로 바꿈
     self.root_path = ""   # 저장 경로 설정
@@ -27,8 +27,6 @@ class TwitchLiveCheck:
     self.login_name = self.streamerID.replace(',', '').split(' ')
     self.download_path = {}
     self.procs = {}
-    atexit.register(self.revoke_token())
-    atexit.register(self.terminate_proc())
     for id in self.login_name:
       self.download_path[id] = os.path.join(self.root_path, id)
       if(os.path.isdir(self.download_path[id]) is False):
@@ -83,16 +81,17 @@ class TwitchLiveCheck:
     info = {}
     status = False
     try:
-      res = requests.get(api, headers=h)
-      res.raise_for_status()
-      if len(res.json()['data']) == 0:
-        status, info = False, {}
-      else:
-        for i in res.json()['data']:
-          info[i['user_login']] = {'title': i['title'], 'game': i['game_name']}
-          self.login_name.remove(i['user_login'])
-        self.url_params = self.create_params(self.login_name)
-        status = True
+      if self.login_name != []:
+        res = requests.get(api, headers=h)
+        res.raise_for_status()
+        if len(res.json()['data']) == 0:
+          status, info = False, {}
+        else:
+          for i in res.json()['data']:
+            info[i['user_login']] = {'title': i['title'], 'game': i['game_name']}
+            self.login_name.remove(i['user_login'])
+          self.url_params = self.create_params(self.login_name)
+          status = True
 
     except (KeyboardInterrupt, SystemExit):
       self.terminate_proc()
@@ -106,12 +105,13 @@ class TwitchLiveCheck:
       status, info = self.check_live()
       if status is True:
         for id in info:
-          print(id + 'is online. Stream recording in session.')
-          title = info[id] if info[id]['title'] != '' else 'Untitled'
-          game = info[id] if info[id]['game'] != '' else 'Unknown'
+          print(id, ' is online. Stream recording in session.')
+          title = info[id]['title'] if info[id]['title'] != '' else 'Untitled'
+          game = info[id]['game'] if info[id]['game'] != '' else 'Unknown'
           filename = id + ' - ' + datetime.datetime.now().strftime("%Y%m%d %Hh%Mm%Ss") + '_' + title + '_' + game + '.ts'
+          filename = "".join(x for x in filename if x.isalnum() or x in [" ", "-", "_", "."])
           file_path = os.path.join(self.download_path[id], filename)
-          self.procs[id] = subprocess.Popen(['streamlink', "--stream-segment-threads", "5", "--stream-segment-attempts" , "5", "--twitch-disable-hosting", "--twitch-disable-ads", 'www.twitch.tv/', id, self.quality, "-o", file_path])
+          self.procs[id] = subprocess.Popen(['streamlink', "--stream-segment-threads", "5", "--stream-segment-attempts" , "5", "--twitch-disable-hosting", "--twitch-disable-ads", 'www.twitch.tv/' + id, self.quality, "-o", file_path])
         # 화질 체크 반복 기능 필요
         self.check_process()
       else:
@@ -124,11 +124,13 @@ class TwitchLiveCheck:
       for id in self.procs:
         proc_code = self.procs[id].poll()
         if proc_code == None:
-          print(id + "is still recording")
+          # print(id, " is still recording")
+          pass
         elif proc_code == 0:
-          print(id + "is still recording")
+          # print(id, " is still recording")
+          pass
         else:
-          print(id + " stream is done. Go back checking...")
+          print(id, " stream is done. Go back checking...")
           self.login_name.append(id)
           id_status = True
     if id_status is True:
@@ -147,9 +149,9 @@ class TwitchLiveCheck:
 def main(argv):
   twitch_check = TwitchLiveCheck()
 
-
-
   twitch_check.run()
+  atexit.register(twitch_check.revoke_token())
+  atexit.register(twitch_check.terminate_proc())
 
 
 if __name__ == '__main__':
