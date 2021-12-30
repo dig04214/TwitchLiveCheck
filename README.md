@@ -15,14 +15,14 @@
 * argv 기능
 
 ## requirement:
-> python   
+> python 3.6 또는 이후  
 > twtich developers에서 등록한 client ID, client secret   
-> streamlink   
+> streamlink 2.4.0 또는 이후   
 
 
 
 ## 사용방법:
 1. https://dev.twitch.tv/console/apps/create 에 접속해 응용 프로그램 등록 후 client id, client secret 생성
 2. TwitchLiveCheck.py를 에디터로 열기
-3. 주석 참고해 init 내부 변수 수정(현재는 별도의 configKey.py을 생성해야 함 -> 추후 수정)
+3. 주석 참고해 init 내부 변수 수정
 4. 실행
