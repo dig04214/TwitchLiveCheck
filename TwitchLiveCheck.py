@@ -14,7 +14,7 @@ class TwitchLiveCheck:
   def __init__(self) -> None:
     self.streamerID = configKey.streamerID   # 스트리머 ID, 띄어쓰기로 구분
     self.quality = "best"   # 화질 설정, 1080p60, 1080p, best 중 하나 추천
-    self.refresh = 1.0   # 탐색 간격(초) 설정, 0.5이하의 값 금지
+    self.refresh = 1.5   # 탐색 간격(초) 설정, 0.5이하의 값 금지
     self.check = 30   # 화질 탐색 횟수 설정, 탐색 횟수 이상으로 설정된 화질 없으면 best로 바꿈
     self.root_path = configKey.root_path   # 저장 경로 설정
 
@@ -108,7 +108,7 @@ class TwitchLiveCheck:
       status, info = self.check_live()
       if status is True:
         for id in info:
-          print(id, ' is online. Stream recording in session.')
+          print(id, 'is online. Stream recording in session.')
           title = info[id]['title'] if info[id]['title'] != '' else 'Untitled'
           game = info[id]['game'] if info[id]['game'] != '' else 'Unknown'
           filename = id + ' - ' + datetime.datetime.now().strftime("%Y%m%d %Hh%Mm%Ss") + '_' + title + '_' + game + '.ts'
@@ -116,9 +116,9 @@ class TwitchLiveCheck:
           file_path = os.path.join(self.download_path[id], filename)
           self.procs[id] = subprocess.Popen(['streamlink', "--stream-segment-threads", "5", "--stream-segment-attempts" , "5", "--twitch-disable-hosting", "--twitch-disable-ads", 'www.twitch.tv/' + id, self.stream_quality[id], "-o", file_path])
         # 화질 체크 반복 기능 필요
-        self.check_process()
-      else:
-        self.check_process()
+      if self.login_name != []:
+        print(self.login_name, 'is offline. Check again in', self.refresh, 'seconds.')
+      self.check_process()
       time.sleep(self.refresh)
 
   def check_process(self) -> None:
@@ -133,7 +133,7 @@ class TwitchLiveCheck:
           # print(id, " is still recording")
           pass
         else:
-          print(id, " stream is done. Go back checking...")
+          print(id, "stream is done. Go back checking...")
           self.login_name.append(id)
           id_status = True
     if id_status is True:
