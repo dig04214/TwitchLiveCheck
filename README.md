@@ -11,18 +11,20 @@
 * 영상 저장 위치 지정
 * streamlink를 활용해 생방송 다운로드
 
-미구현 기능   
+구현 예정   
 * argv 기능
+* 에러 로깅
 
 ## requirement:
-> python 3.6 또는 이후  
+> python 3.6 이상   
+> python requests 모듈   
 > twtich developers에서 등록한 client ID, client secret   
-> streamlink 2.4.0 또는 이후   
+> streamlink 2.4.0 이상   
 
 
 
 ## 사용방법:
 1. https://dev.twitch.tv/console/apps/create 에 접속해 응용 프로그램 등록 후 client id, client secret 생성
 2. TwitchLiveCheck.py를 에디터로 열기
-3. 주석 참고해 init 내부 변수 수정
+3. 주석 참고해 `__init__(self)` 내부 변수 수정
 4. 실행
