@@ -128,6 +128,8 @@ dmypy.json
 # Pyre type checker
 .pyre/
 
-
-#test config py
+# test config py
 configKey.py
+
+# logging
+.log

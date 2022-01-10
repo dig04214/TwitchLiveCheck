@@ -10,21 +10,37 @@
 * 화질 탐색 반복 기능(생방송 초기에 저화질만 나오는 경우 일정 횟수 동안 원하는 화질이 생겼는지 확인)
 * 영상 저장 위치 지정
 * streamlink를 활용해 생방송 다운로드
+* 에러 로깅(traceback 활용)
 
 구현 예정   
 * argv 기능
-* 에러 로깅
+
 
 ## requirement:
-> python 3.6 이상   
-> python requests 모듈   
-> twtich developers에서 등록한 client ID, client secret   
-> streamlink 2.4.0 이상   
+> python 3.6 or later   
+> python requests   
+> Client ID, Client Secret acquired in the Twitch developers site   
+> streamlink 2.4.0 or later   
 
 
 
-## 사용방법:
-1. https://dev.twitch.tv/console/apps/create 에 접속해 응용 프로그램 등록 후 client id, client secret 생성
-2. TwitchLiveCheck.py를 에디터로 열기
-3. 주석 참고해 `__init__(self)` 내부 변수 수정
-4. 실행
+## Usage:
+1. [install Python](https://www.python.org/downloads/)
+2. in your terminal, type `pip install requests`
+3. [install Streamlink](https://github.com/streamlink/streamlink/releases)
+4. <https://dev.twitch.tv/console/apps/create/> Create your Client ID and Client Secret
+5. open `TwitchLiveCheck.py` as your editor
+6. modify the internal variable of `__init__(self)`  by referring to the comments
+```python
+def  __init__(self)  ->  None:
+
+self.streamerID =  ""  # You can enter up to 100 streamers, separated by spaces
+self.quality =  "1080p60"  # Set recording quality.
+self.refresh =  1  # Check interval in seconds
+self.check =  30  # Set the number of searches for recording quality. If there's no recording quality beyond the number of searches, change the quality to best.
+self.root_path =  r""  # Set recording path
+self.traceback_log = False # if True, save log file
+self.client_id =  ""  # client ID
+self.client_secret =  ""  # client secret
+```
+7. type `python TwitchLiveCheck.py` in your terminal
