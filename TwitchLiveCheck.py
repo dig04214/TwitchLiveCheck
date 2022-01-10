@@ -10,7 +10,6 @@ import logging
 import traceback
 import configKey
 
-logging.basicConfig(filename=f'./{datetime.datetime.now().strftime("%Y%m%d-%Hh%Mm%Ss")}.log', level=logging.ERROR)
 
 class TwitchLiveCheck:
   def __init__(self) -> None:
@@ -173,8 +172,9 @@ class TwitchLiveCheck:
 
 def main(argv):
   twitch_check = TwitchLiveCheck()
-  if twitch_check.log:
+  if twitch_check.traceback_log:
     try:
+      logging.basicConfig(filename=f'./{datetime.datetime.now().strftime("%Y%m%d-%Hh%Mm%Ss")}.log', level=logging.ERROR)
       twitch_check.run()
     except:
       logging.error(traceback.format_exc())
