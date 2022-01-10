@@ -18,14 +18,12 @@ class TwitchLiveCheck:
     self.refresh = configKey.refresh   # 탐색 간격(초) 설정, 0.5이하의 값 금지
     self.check = configKey.check   # 화질 탐색 횟수 설정, 탐색 횟수 이상으로 설정된 화질 없으면 best로 바꿈
     self.root_path = configKey.root_path   # 저장 경로 설정
-    self.traceback_log = configKey.traceback_log # log 파일 저장 설정
+    self.traceback_log = configKey.traceback_log   # log 파일 저장 설정
 
     self.client_id = configKey.client_id   # client ID 설정, twitch developers에서 발급
     self.client_secret = configKey.client_secret   # client secret 설정, twitch developers에서 발급
 
   def run(self) -> None:
-    if self.traceback_log:
-      logging.basicConfig(filename=f'{self.root_path}/{datetime.datetime.now().strftime("%Y%m%d-%Hh%Mm%Ss")}.log', level=logging.ERROR)
     self.user_token = self.create_token()
     self.login_name = self.streamerID.split(' ')
     self.download_path = {}
@@ -176,6 +174,7 @@ class TwitchLiveCheck:
 def main(argv):
   twitch_check = TwitchLiveCheck()
   if twitch_check.traceback_log:
+    logging.basicConfig(filename=f'{os.path.dirname(os.path.abspath(__file__))}/{datetime.datetime.now().strftime("%Y%m%d-%Hh%Mm%Ss")}.log', level=logging.ERROR, format='%(asctime)s-%(levelname)s-%(name)s-%(message)s')
     try:
       twitch_check.run()
     except:
