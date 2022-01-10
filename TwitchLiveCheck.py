@@ -22,9 +22,10 @@ class TwitchLiveCheck:
 
     self.client_id = configKey.client_id   # client ID 설정, twitch developers에서 발급
     self.client_secret = configKey.client_secret   # client secret 설정, twitch developers에서 발급
-    
 
   def run(self) -> None:
+    if self.traceback_log:
+      logging.basicConfig(filename=f'{self.root_path}/{datetime.datetime.now().strftime("%Y%m%d-%Hh%Mm%Ss")}.log', level=logging.ERROR)
     self.user_token = self.create_token()
     self.login_name = self.streamerID.split(' ')
     self.download_path = {}
@@ -37,7 +38,7 @@ class TwitchLiveCheck:
       self.download_path[id] = os.path.join(self.root_path, id)
       if(os.path.isdir(self.download_path[id]) is False):
         os.makedirs(self.download_path[id])
-
+    
     self.url_params = self.create_params(self.login_name)
     print("Checking for", self.login_name, "every", self.refresh, "seconds. Record with", self.quality, "quality.")
     self.loop_check()
@@ -56,7 +57,7 @@ class TwitchLiveCheck:
     token = res.json()['access_token']
     return token
 
-  def validate_token(self) -> None:
+  def validate_token(self) -> None:   # app access token 확인
     api = 'https://id.twitch.tv/oauth2/validate'
     h = {'Authorization': f'Bearer {self.user_token}'}
     res = requests.get(api, headers=h)
@@ -71,14 +72,14 @@ class TwitchLiveCheck:
     }
     res = requests.post(api, data=payload)
 
-  def create_params(self, username) -> dict:
+  def create_params(self, username) -> str:
     params = ''
     for id in username:
       params = params + f'&user_login={id}'
     params = params[1:]
     return params
 
-  def check_live(self) -> tuple:
+  def check_live(self) -> dict:
     try:
       self.validate_token()
       api = 'https://api.twitch.tv/helix/streams?' + self.url_params
@@ -97,6 +98,8 @@ class TwitchLiveCheck:
           self.url_params = self.create_params(self.login_name)
     except requests.exceptions.ConnectionError:
       print("requests.exceptions.ConnectionError. Go back checking...")
+      if self.traceback_log:
+        logging.error(traceback.format_exc())
       info = {}
     return info
 
@@ -109,7 +112,7 @@ class TwitchLiveCheck:
             print('', id, 'is online. Stream recording in session.')
             title = info[id]['title'] if info[id]['title'].replace(' ', '') != '' else 'Untitled'
             game = info[id]['game'] if info[id]['game'] != '' else 'Unknown'
-            filename = id + ' - ' + datetime.datetime.now().strftime("%Y%m%d %Hh%Mm%Ss") + '_' + title + '_' + game + '.ts'
+            filename = id + '-' + datetime.datetime.now().strftime("%Y%m%d %Hh%Mm%Ss") + '_' + title + '_' + game + '.ts'
             filename = "".join(x for x in filename if x.isalnum() or x not in ['\\', '/', ':', '*', '?', '\"', '<', '>', '|'])
             file_path = os.path.join(self.download_path[id], filename)
             print(file_path)
@@ -174,7 +177,6 @@ def main(argv):
   twitch_check = TwitchLiveCheck()
   if twitch_check.traceback_log:
     try:
-      logging.basicConfig(filename=f'./{datetime.datetime.now().strftime("%Y%m%d-%Hh%Mm%Ss")}.log', level=logging.ERROR)
       twitch_check.run()
     except:
       logging.error(traceback.format_exc())
