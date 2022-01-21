@@ -132,4 +132,5 @@ dmypy.json
 configKey.py
 
 # logging
-.log
+*.txt
+*.json

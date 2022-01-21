@@ -8,11 +8,11 @@ import getopt
 import atexit
 import logging
 import traceback
-import configKey
 
 
 class TwitchLiveCheck:
   def __init__(self) -> None:
+    import configKey
     self.streamerID = configKey.streamerID   # 스트리머 ID 입력, 띄어쓰기로 구분, 100명까지 입력 가능(api 최대 한도)
     self.quality = configKey.quality   # 화질 설정, 1080p60, 1080p, best 중 하나 추천
     self.refresh = configKey.refresh   # 탐색 간격(초) 설정, 0.5이하의 값 금지
@@ -30,8 +30,8 @@ class TwitchLiveCheck:
     self.procs = {}
     self.stream_quality = dict.fromkeys(self.login_name, self.quality)
     self.check_num = dict.fromkeys(self.login_name, 0)
-    atexit.register(self.terminate_proc)
     atexit.register(self.revoke_token)
+    atexit.register(self.terminate_proc)
     for id in self.login_name:
       self.download_path[id] = os.path.join(self.root_path, id)
       if(os.path.isdir(self.download_path[id]) is False):
@@ -69,6 +69,10 @@ class TwitchLiveCheck:
       'token': self.user_token
     }
     res = requests.post(api, data=payload)
+    if self.traceback_log:
+        logging.info('app access token revoked')
+    else:
+      print('app access token revoked')
 
   def create_params(self, username) -> str:
     params = ''
@@ -102,27 +106,22 @@ class TwitchLiveCheck:
     return info
 
   def loop_check(self) -> None:
-    try:
-      while True:
-        info = self.check_live()
-        if info != {}:
-          for id in info:
-            print('', id, 'is online. Stream recording in session.')
-            title = info[id]['title'] if info[id]['title'].replace(' ', '') != '' else 'Untitled'
-            game = info[id]['game'] if info[id]['game'] != '' else 'Unknown'
-            filename = id + '-' + datetime.datetime.now().strftime("%Y%m%d %Hh%Mm%Ss") + '_' + title + '_' + game + '.ts'
-            filename = "".join(x for x in filename if x.isalnum() or x not in ['\\', '/', ':', '*', '?', '\"', '<', '>', '|'])
-            file_path = os.path.join(self.download_path[id], filename)
-            print(file_path)
-            self.procs[id] = subprocess.Popen(['streamlink', "--stream-segment-threads", "5", "--stream-segment-attempts" , "5", "--twitch-disable-hosting", "--twitch-disable-ads", 'www.twitch.tv/' + id, self.stream_quality[id], "-o", file_path])
-        if self.login_name != []:
-          print('', self.login_name, 'is offline. Check again in', self.refresh, 'seconds.')
-        self.check_process()
-        time.sleep(self.refresh)
-    except SystemExit:
-      self.terminate_proc()
-      self.revoke_token()
-      raise
+    while True:
+      info = self.check_live()
+      if info != {}:
+        for id in info:
+          print('', id, 'is online. Stream recording in session.')
+          title = info[id]['title'] if info[id]['title'].replace(' ', '') != '' else 'Untitled'
+          game = info[id]['game'] if info[id]['game'] != '' else 'Unknown'
+          filename = id + '-' + datetime.datetime.now().strftime("%Y%m%d %Hh%Mm%Ss") + '_' + title + '_' + game + '.ts'
+          filename = "".join(x for x in filename if x.isalnum() or x not in ['\\', '/', ':', '*', '?', '\"', '<', '>', '|'])
+          file_path = os.path.join(self.download_path[id], filename)
+          print(file_path)
+          self.procs[id] = subprocess.Popen(['streamlink', "--stream-segment-threads", "5", "--stream-segment-attempts" , "5", "--twitch-disable-hosting", "--twitch-disable-ads", 'www.twitch.tv/' + id, self.stream_quality[id], "-o", file_path])
+      if self.login_name != []:
+        print('', self.login_name, 'is offline. Check again in', self.refresh, 'seconds.')
+      self.check_process()
+      time.sleep(self.refresh)
 
   def check_quality(self, id) -> bool:
     proc = subprocess.Popen(['streamlink', 'www.twitch.tv/' + id], stdout=subprocess.PIPE, universal_newlines=True)
@@ -169,13 +168,25 @@ class TwitchLiveCheck:
       for id in self.procs:
         self.procs[id].terminate()
         self.procs[id].poll()
-      print('subprocess terminate')
+      if self.traceback_log:
+        logging.info('subprocess terminated')
+      else:
+        print('subprocess terminated')
 
 def main(argv):
+  if getattr(sys, 'frozen', False):
+    exec_dir = os.path.dirname(sys.executable)
+    sys.path.append(exec_dir)
+  else:
+    exec_dir = os.path.dirname(__file__)
+
+  print("configKey directory:", exec_dir)
   twitch_check = TwitchLiveCheck()
   if twitch_check.traceback_log:
-    logging.basicConfig(filename=f'{os.path.dirname(os.path.abspath(__file__))}/{datetime.datetime.now().strftime("%Y%m%d-%Hh%Mm%Ss")}.log', level=logging.ERROR, format='%(asctime)s-%(levelname)s-%(name)s-%(message)s')
+    log_format = '%(asctime)s-%(levelname)s-%(name)s-%(message)s'
+    logging.basicConfig(filename=f'{exec_dir}/{datetime.datetime.now().strftime("%Y%m%d-%Hh%Mm%Ss")}.txt', level=logging.INFO, format=log_format)
     try:
+      print("log file directory:", exec_dir)
       twitch_check.run()
     except:
       logging.error(traceback.format_exc())
