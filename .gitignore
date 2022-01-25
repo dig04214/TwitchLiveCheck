@@ -130,6 +130,7 @@ dmypy.json
 
 # test config py
 configKey.py
+test.py
 
 # logging
 *.txt

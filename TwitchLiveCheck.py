@@ -4,7 +4,8 @@ import time
 import sys
 import subprocess
 import datetime
-import getopt
+import argparse
+import pathlib
 import atexit
 import logging
 import traceback
@@ -14,7 +15,8 @@ class TwitchLiveCheck:
   def __init__(self) -> None:
     import configKey
     self.streamerID = configKey.streamerID   # 스트리머 ID 입력, 띄어쓰기로 구분, 100명까지 입력 가능(api 최대 한도)
-    self.quality = configKey.quality   # 화질 설정, 1080p60, 1080p, best 중 하나 추천
+    self.quality_by_streamer = configKey.quality_by_streamer   # 스트리머 별 화질 설정. streamerID랑 겹치면 안됨
+    self.quality = configKey.quality   # 기본 화질 설정, 1080p60, 1080p, best 중 하나 추천
     self.refresh = configKey.refresh   # 탐색 간격(초) 설정, 0.5이하의 값 금지
     self.check = configKey.check   # 화질 탐색 횟수 설정, 탐색 횟수 이상으로 설정된 화질 없으면 best로 바꿈
     self.root_path = configKey.root_path   # 저장 경로 설정
@@ -25,10 +27,12 @@ class TwitchLiveCheck:
 
   def run(self) -> None:
     self.user_token = self.create_token()
-    self.login_name = self.streamerID.split(' ')
     self.download_path = {}
     self.procs = {}
-    self.stream_quality = dict.fromkeys(self.login_name, self.quality)
+    proccessed_username = list(set(self.streamerID.strip().split(' ')) - set(list(self.quality_by_streamer.keys())))
+    self.quality_by_streamer.update(dict.fromkeys(proccessed_username, self.quality))
+    self.stream_quality = self.quality_by_streamer
+    self.login_name = list(self.quality_by_streamer.keys())
     self.check_num = dict.fromkeys(self.login_name, 0)
     atexit.register(self.revoke_token)
     atexit.register(self.terminate_proc)
@@ -99,7 +103,7 @@ class TwitchLiveCheck:
               self.login_name.remove(i['user_login'])
           self.url_params = self.create_params(self.login_name)
     except requests.exceptions.ConnectionError:
-      print("requests.exceptions.ConnectionError. Go back checking...")
+      print(" requests.exceptions.ConnectionError. Go back checking...")
       if self.traceback_log:
         logging.error(traceback.format_exc())
       info = {}
@@ -112,8 +116,8 @@ class TwitchLiveCheck:
         for id in info:
           print('', id, 'is online. Stream recording in session.')
           title = info[id]['title'] if info[id]['title'].replace(' ', '') != '' else 'Untitled'
-          game = info[id]['game'] if info[id]['game'] != '' else 'Unknown'
-          filename = id + '-' + datetime.datetime.now().strftime("%Y%m%d %Hh%Mm%Ss") + '_' + title + '_' + game + '.ts'
+          game = info[id]['game'] if info[id]['game'] != '' else 'Null'
+          filename = id + '-' + datetime.datetime.now().strftime("%Y%m%d_%Hh%Mm%Ss") + '_' + title + '_' + game + '.ts'
           filename = "".join(x for x in filename if x.isalnum() or x not in ['\\', '/', ':', '*', '?', '\"', '<', '>', '|'])
           file_path = os.path.join(self.download_path[id], filename)
           print(file_path)
@@ -152,12 +156,14 @@ class TwitchLiveCheck:
           print('', id, "stream is done. Go back checking...")
           del self.procs[id]
           self.login_name.append(id)
+          self.stream_quality[id] = self.quality_by_streamer[id]
           id_status = True
         else:
           # 비정상 종료
           print('', id, "stream error. Error code:", proc_code)
           del self.procs[id]
           self.login_name.append(id)
+          self.stream_quality[id] = self.quality_by_streamer[id]
           id_status = True
     if id_status is True:
       self.url_params = self.create_params(self.login_name)
@@ -173,7 +179,20 @@ class TwitchLiveCheck:
       else:
         print('subprocess terminated')
 
-def main(argv):
+def parsing_arguments() -> argparse.Namespace:
+  parser = argparse.ArgumentParser()
+  parser.add_argument("-u", "--username", type=str, help="Enter the streamer's username")
+  parser.add_argument("-q", "--quality", type=str, help="Enter the recording quality")
+  parser.add_argument("-ci", "--client-id", type=str, help="Enter Client ID")
+  parser.add_argument("-cs", "--client-secret", type=str, help="Enter Client Secret")
+  parser.add_argument("-r", "--refresh", type=float, help="Enter interval (in seconds) to check for streams")
+  parser.add_argument("-c", "--check", type=int, help="Enter the number of times to check the recording quality")
+  parser.add_argument("-p", "--root-path", type=pathlib.Path, help="Enter the recording path")
+  parser.add_argument("-d", "--debug", action="store_true", help="Set the logging option")
+  args = parser.parse_args()
+  return args
+
+def main(argv) -> None:
   if getattr(sys, 'frozen', False):
     exec_dir = os.path.dirname(sys.executable)
     sys.path.append(exec_dir)
@@ -182,9 +201,29 @@ def main(argv):
 
   print("configKey directory:", exec_dir)
   twitch_check = TwitchLiveCheck()
+  args = parsing_arguments()
+
+  if args.username != None:
+    twitch_check.streamerID = args.username
+    twitch_check.quality_by_streamer = {}
+  if args.quality != None:
+    twitch_check.quality = args.quality
+  if args.client_id != None:
+    twitch_check.client_id = args.client_id
+  if args.client_secret != None:
+    twitch_check.client_secret = args.client_secret
+  if args.refresh != None:
+    twitch_check.refresh = args.refresh
+  if args.check != None:
+    twitch_check.check = args.check
+  if args.root_path != None:
+    twitch_check.root_path = args.root_path
+  if args.debug:
+    twitch_check.traceback_log = True
+  
   if twitch_check.traceback_log:
     log_format = '%(asctime)s-%(levelname)s-%(name)s-%(message)s'
-    logging.basicConfig(filename=f'{exec_dir}/{datetime.datetime.now().strftime("%Y%m%d-%Hh%Mm%Ss")}.txt', level=logging.INFO, format=log_format)
+    logging.basicConfig(filename=f'{exec_dir}/{datetime.datetime.now().strftime("%Y%m%d-%Hh%Mm%Ss")}.log', level=logging.INFO, format=log_format)
     try:
       print("log file directory:", exec_dir)
       twitch_check.run()

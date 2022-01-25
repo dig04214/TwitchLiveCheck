@@ -35,11 +35,12 @@ def  __init__(self)  ->  None:
 
   self.streamerID = ""  # You can input up to 100 streamers(api maximum limit), separated by spaces
   self.quality = "1080p60"  # Set recording quality.
-  self.refresh = 1  # Check interval in seconds
-  self.check = 30  # Set the number of searches for recording quality. If there's no recording quality beyond the number of searches, change the quality to best.
+  self.refresh = 1  # Check interval (in seconds) to check for streams
+  self.check = 30  # Set the number of times to check the recording quality. If there's no recording quality beyond the number of searches, change the quality to best.
   self.root_path = r""  # Set recording path
   self.traceback_log = False  # if True, save traceback log file
   self.client_id = ""  # Client ID
   self.client_secret = ""  # Client Secret
 ```
 7. type `python TwitchLiveCheck.py` in your terminal
+8. if you want to put command line arguments, type `python TwitchLiveCheck.py -h` in your terminal
