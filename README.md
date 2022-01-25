@@ -1,12 +1,7 @@
 # TwitchLiveCheck
-Check multiple streams and download using Twitch helix api and streamlink
-
 
 1. Twitch helix api를 활용한 다수의 스트리밍 확인
 2. streamlink를 활용한 생방송 다운로드
-
-1. Check multiple streams using Twitch helix api
-2. Download live broadcast using streamlink
 
 
 구현 완료   
@@ -17,13 +12,18 @@ Check multiple streams and download using Twitch helix api and streamlink
 * streamlink를 활용해 생방송 다운로드
 * 에러 로깅(traceback 활용)
 * argv 기능
+***
+
+# TwitchLiveCheck
+
+1. Check multiple streams using Twitch helix api
+2. Download live broadcast using streamlink
 
 
 ## requirement:
 > python 3.6 or later   
 > python requests   
 > streamlink 2.4.0 or later   
-
 
 
 ## Usage:
