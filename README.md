@@ -4,6 +4,10 @@
 1. Twitch helix api를 활용한 다수의 스트리밍 확인
 2. streamlink를 활용한 생방송 다운로드
 
+1. Check multiple streams using Twitch helix api
+2. Download live broadcast using streamlink
+
+
 구현 완료   
 * 다수의 스트리머 생방송 여부 확인
 * 화질 설정
@@ -11,8 +15,6 @@
 * 영상 저장 위치 지정
 * streamlink를 활용해 생방송 다운로드
 * 에러 로깅(traceback 활용)
-
-구현 예정   
 * argv 기능
 
 
@@ -34,7 +36,7 @@
 def  __init__(self)  ->  None:
 
   self.streamerID = ""  # You can input up to 100 streamers(api maximum limit), separated by spaces
-  self.quality_by_streamer = {}  # You can enter the streamer-specific quality if necessary. Don't overlap self.streamerID. example: {"username 1":"quality 1", "ussername 2":"quality 2"}
+  self.quality_by_streamer = {}  # You can enter the streamer-specific quality if necessary. Don't overlap self.streamerID. example: {"username 1":"quality 1", "username 2":"quality 2"}
   self.quality = "1080p60"  # Set recording quality.
   self.refresh = 1  # Check interval (in seconds) to check for streams
   self.check = 30  # Set the number of times to check the recording quality. If there's no recording quality beyond the number of searches, change the quality to best.
