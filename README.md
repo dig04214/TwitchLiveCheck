@@ -1,4 +1,5 @@
 # TwitchLiveCheck
+Check multiple streams and download using Twitch helix api and streamlink
 
 
 1. Twitch helix api를 활용한 다수의 스트리밍 확인
