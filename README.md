@@ -34,6 +34,7 @@
 def  __init__(self)  ->  None:
 
   self.streamerID = ""  # You can input up to 100 streamers(api maximum limit), separated by spaces
+  self.quality_by_streamer = {}  # You can enter the streamer-specific quality if necessary. Don't overlap self.streamerID. example: {"username 1":"quality 1", "ussername 2":"quality 2"}
   self.quality = "1080p60"  # Set recording quality.
   self.refresh = 1  # Check interval (in seconds) to check for streams
   self.check = 30  # Set the number of times to check the recording quality. If there's no recording quality beyond the number of searches, change the quality to best.
