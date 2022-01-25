@@ -55,8 +55,13 @@ class TwitchLiveCheck:
       'scope': 'user:read:follows user:read:subscriptions'
     }
     res = requests.post(api, data=payload)
-    res.raise_for_status()
-    token = res.json()['access_token']
+    #res.raise_for_status()
+    if res.status_code == requests.codes.ok:
+      token = res.json()['access_token']
+    elif res.status_code == requests.codes.bad_request:
+      raise Exception(res.json()['message'])
+    elif res.status_code == requests.codes.forbidden:
+      raise Exception(res.json()['message'])
     return token
 
   def validate_token(self) -> None:   # app access token 확인
@@ -64,6 +69,7 @@ class TwitchLiveCheck:
     h = {'Authorization': f'Bearer {self.user_token}'}
     res = requests.get(api, headers=h)
     if res.status_code != requests.codes.ok:
+      print(" invalid access token. regenerate token...")
       self.user_token = self.create_token()
 
   def revoke_token(self) -> None:   # app access token 소멸
@@ -87,14 +93,19 @@ class TwitchLiveCheck:
 
   def check_live(self) -> dict:
     try:
-      self.validate_token()
+      #self.validate_token()
       api = 'https://api.twitch.tv/helix/streams?' + self.url_params
       h = {'Authorization': f'Bearer {self.user_token}', 'Client-Id': self.client_id}
       info = {}
       if self.login_name != []:
         res = requests.get(api, headers=h)
-        res.raise_for_status()
-        if res.json()['data'] == []:
+        #res.raise_for_status()
+        if res.status_code == requests.codes.unauthorized:
+          self.user_token = self.create_token()
+          print(" invalid access token. regenerate token...")
+          if self.traceback_log:
+            logging.error("invalid access token. regenerate token...")
+        elif res.json()['data'] == []:
           info = {}
         else:
           for i in res.json()['data']:
