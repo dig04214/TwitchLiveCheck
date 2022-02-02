@@ -7,9 +7,8 @@ import datetime
 import argparse
 import pathlib
 import atexit
-import logging
 import traceback
-
+import logging
 
 class TwitchLiveCheck:
   def __init__(self) -> None:
@@ -29,7 +28,8 @@ class TwitchLiveCheck:
     self.user_token = self.create_token()
     self.download_path = {}
     self.procs = {}
-    proccessed_username = list(set(self.streamerID.strip().split(' ')) - set(list(self.quality_by_streamer.keys())))
+    proccessed_username = set(self.streamerID.strip().split(' ')) - set(self.quality_by_streamer.keys())
+    proccessed_username.discard('')
     self.quality_by_streamer.update(dict.fromkeys(proccessed_username, self.quality))
     self.stream_quality = self.quality_by_streamer
     self.login_name = list(self.quality_by_streamer.keys())
@@ -62,6 +62,8 @@ class TwitchLiveCheck:
       raise Exception(res.json()['message'])
     elif res.status_code == requests.codes.forbidden:
       raise Exception(res.json()['message'])
+    elif res.status_code == requests.codes.internal_server_error:
+      logging.error(' internal server error(token)')
     return token
 
   def validate_token(self) -> None:   # app access token 확인
@@ -102,21 +104,24 @@ class TwitchLiveCheck:
         #res.raise_for_status()
         if res.status_code == requests.codes.unauthorized:
           self.user_token = self.create_token()
-          print(" invalid access token. regenerate token...")
+          res_message = res.json()['message']
+          print(f" {res_message}. regenerate token...")
           if self.traceback_log:
-            logging.error("invalid access token. regenerate token...")
+            logging.error(f" {res_message}. regenerate token...")
+        elif res.status_code == requests.codes.too_many_requests:
+          raise Exception("Too many requests")
         elif res.json()['data'] == []:
-          info = {}
+          pass
         else:
           for i in res.json()['data']:
             if self.check_quality(i['user_login']):
               info[i['user_login']] = {'title': i['title'], 'game': i['game_name']}
               self.login_name.remove(i['user_login'])
           self.url_params = self.create_params(self.login_name)
-    except requests.exceptions.ConnectionError:
+    except requests.exceptions.ConnectionError as e:
       print(" requests.exceptions.ConnectionError. Go back checking...")
       if self.traceback_log:
-        logging.error(traceback.format_exc())
+        logging.error(f'{type(e)} {e}')
       info = {}
     return info
 
@@ -126,10 +131,12 @@ class TwitchLiveCheck:
       if info != {}:
         for id in info:
           print('', id, 'is online. Stream recording in session.')
+          if(os.path.isdir(self.download_path[id]) is False):
+            os.makedirs(self.download_path[id])
           title = info[id]['title'] if info[id]['title'].replace(' ', '') != '' else 'Untitled'
           game = info[id]['game'] if info[id]['game'] != '' else 'Null'
           filename = id + '-' + datetime.datetime.now().strftime("%Y%m%d_%Hh%Mm%Ss") + '_' + title + '_' + game + '.ts'
-          filename = "".join(x for x in filename if x.isalnum() or x not in ['\\', '/', ':', '*', '?', '\"', '<', '>', '|'])
+          filename = "".join(x for x in filename if x not in ['\\', '/', ':', '*', '?', '\"', '<', '>', '|'])
           file_path = os.path.join(self.download_path[id], filename)
           print(file_path)
           self.procs[id] = subprocess.Popen(['streamlink', "--stream-segment-threads", "5", "--stream-segment-attempts" , "5", "--twitch-disable-hosting", "--twitch-disable-ads", 'www.twitch.tv/' + id, self.stream_quality[id], "-o", file_path])
