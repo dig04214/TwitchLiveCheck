@@ -1,3 +1,6 @@
+#!/usr/bin/python
+# -*-coding: utf-8 -*-
+
 import requests
 import os
 import time
@@ -108,6 +111,8 @@ class TwitchLiveCheck:
           print(f" {res_message}. regenerate token...")
           if self.traceback_log:
             logging.error(f" {res_message}. regenerate token...")
+        elif res.status_code == requests.codes.bad_request:
+          raise Exception(res.json()['message'])
         elif res.status_code == requests.codes.too_many_requests:
           raise Exception("Too many requests")
         elif res.json()['data'] == []:
