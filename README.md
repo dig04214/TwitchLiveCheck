@@ -36,12 +36,12 @@
 ```python
 def  __init__(self)  ->  None:
 
-  self.streamerID = ""  # You can input up to 100 streamers(api maximum limit), separated by spaces
+  self.streamerID = ""  # You can enter up to 100 streamers(api maximum limit), separated by spaces example: "username1 username2 ... "
   self.quality_by_streamer = {}  # You can enter the streamer-specific quality if necessary. Don't overlap self.streamerID. example: {"username 1":"quality 1", "username 2":"quality 2"}
   self.quality = "1080p60"  # Set recording quality.
-  self.refresh = 1  # Check interval (in seconds) to check for streams
-  self.check = 30  # Set the number of times to check the recording quality. If there's no recording quality beyond the number of searches, change the quality to best.
-  self.root_path = r""  # Set recording path
+  self.refresh = 1  # Check interval (in seconds) to check for streams. you can enter decimals
+  self.check = 30  # Set the number of times to check the recording quality. If there's no recording quality beyond the number of searches, change the quality to best. you must enter an integer
+  self.root_path = r""  # Set recording path. do not delete thr 'r' character
   self.traceback_log = False  # if True, save traceback log file
   self.client_id = ""  # Client ID
   self.client_secret = ""  # Client Secret

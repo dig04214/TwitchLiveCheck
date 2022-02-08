@@ -15,23 +15,22 @@ import logging
 
 class TwitchLiveCheck:
   def __init__(self) -> None:
-    import configKey
-    self.streamerID = configKey.streamerID   # 스트리머 ID 입력, 띄어쓰기로 구분, 100명까지 입력 가능(api 최대 한도)
-    self.quality_by_streamer = configKey.quality_by_streamer   # 스트리머 별 화질 설정. streamerID랑 겹치면 안됨
-    self.quality = configKey.quality   # 기본 화질 설정, 1080p60, 1080p, best 중 하나 추천
-    self.refresh = configKey.refresh   # 탐색 간격(초) 설정, 0.5이하의 값 금지
-    self.check = configKey.check   # 화질 탐색 횟수 설정, 탐색 횟수 이상으로 설정된 화질 없으면 best로 바꿈
-    self.root_path = configKey.root_path   # 저장 경로 설정
-    self.traceback_log = configKey.traceback_log   # log 파일 저장 설정
+    self.streamerID = ""   # 스트리머 ID 입력, 띄어쓰기로 구분, 100명까지 입력 가능(api 최대 한도)
+    self.quality_by_streamer = {}   # 스트리머 별 화질 설정. streamerID랑 겹치면 안됨
+    self.quality = "1080p60"   # 기본 화질 설정, 1080p60, 1080p, best 중 하나 추천
+    self.refresh = 1   # 탐색 간격(초) 설정, 0.5이하의 값 금지
+    self.check = 30   # 화질 탐색 횟수 설정, 탐색 횟수 이상으로 설정된 화질 없으면 best로 바꿈
+    self.root_path = r""   # 저장 경로 설정
+    self.traceback_log = False   # log 파일 저장 설정
 
-    self.client_id = configKey.client_id   # client ID 설정, twitch developers에서 발급
-    self.client_secret = configKey.client_secret   # client secret 설정, twitch developers에서 발급
+    self.client_id = ""   # client ID 설정, twitch developers에서 발급
+    self.client_secret = ""   # client secret 설정, twitch developers에서 발급
 
   def run(self) -> None:
     self.user_token = self.create_token()
     self.download_path = {}
     self.procs = {}
-    proccessed_username = set(self.streamerID.strip().split(' ')) - set(self.quality_by_streamer.keys())
+    proccessed_username = set(self.streamerID.strip().split(' ')) - set(self.quality_by_streamer)
     proccessed_username.discard('')
     self.quality_by_streamer.update(dict.fromkeys(proccessed_username, self.quality))
     self.stream_quality = self.quality_by_streamer
