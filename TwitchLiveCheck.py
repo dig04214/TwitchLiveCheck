@@ -30,11 +30,18 @@ class TwitchLiveCheck:
     self.user_token = self.create_token()
     self.download_path = {}
     self.procs = {}
-    proccessed_username = set(self.streamerID.strip().split(' ')) - set(self.quality_by_streamer)
+    for id in list(self.quality_by_streamer.keys()):
+      self.quality_by_streamer[id.lower()] = self.quality_by_streamer.pop(id)
+    proccessed_username = set(self.streamerID.strip().lower().split(' ')) - set(self.quality_by_streamer)
     proccessed_username.discard('')
     self.quality_by_streamer.update(dict.fromkeys(proccessed_username, self.quality))
     self.stream_quality = self.quality_by_streamer
     self.login_name = list(self.quality_by_streamer.keys())
+    if self.login_name == []:
+      print('Please enter the streamer username')
+      if self.traceback_log:
+        logging.error('no streamer username')
+      sys.exit()
     self.check_num = dict.fromkeys(self.login_name, 0)
     atexit.register(self.revoke_token)
     atexit.register(self.terminate_proc)
@@ -113,7 +120,21 @@ class TwitchLiveCheck:
         elif res.status_code == requests.codes.bad_request:
           raise Exception(res.json()['message'])
         elif res.status_code == requests.codes.too_many_requests:
-          raise Exception("Too many requests")
+          print(' Too many request! wait until reset-time...')
+          if self.traceback_log:
+            logging.error('Too many request!')
+          reset_time = int(res.headers['Ratelimit-Reset'])
+          while(True):
+            now_timestamp = time.mktime(datetime.datetime.today().timetuple())
+            if reset_time < now_timestamp:
+              print(' Reset-time! continue to check...')
+              if self.traceback_log:
+                logging.info('Reset-time! continue to check...')
+              break
+            else:
+              self.check_process()
+              print(' Check streamlink process...', 'reset-time:', reset_time, ', now:', now_timestamp)
+              time.sleep(self.refresh)
         elif res.json()['data'] == []:
           pass
         else:
@@ -130,6 +151,7 @@ class TwitchLiveCheck:
     return info
 
   def loop_check(self) -> None:
+    escape_str = ['\\', '/', ':', '*', '?', '\"', '<', '>', '|', '\a', '\b', '\f', '\n', '\r', '\t', r'\v', r'\u', r'\x', r'\N', r'\U', '\f\r', '\r\n', '\x1c', '\x1d', '\x1e', '\x85', '\u2028', '\u2029']
     while True:
       info = self.check_live()
       if info != {}:
@@ -140,7 +162,7 @@ class TwitchLiveCheck:
           title = info[id]['title'] if info[id]['title'].replace(' ', '') != '' else 'Untitled'
           game = info[id]['game'] if info[id]['game'] != '' else 'Null'
           filename = id + '-' + datetime.datetime.now().strftime("%Y%m%d_%Hh%Mm%Ss") + '_' + title + '_' + game + '.ts'
-          filename = "".join(x for x in filename if x not in ['\\', '/', ':', '*', '?', '\"', '<', '>', '|', '\n'])
+          filename = "".join(x for x in filename if x not in escape_str)
           file_path = os.path.join(self.download_path[id], filename)
           print(file_path)
           self.procs[id] = subprocess.Popen(['streamlink', "--stream-segment-threads", "5", "--stream-segment-attempts" , "5", "--twitch-disable-hosting", "--twitch-disable-ads", 'www.twitch.tv/' + id, self.stream_quality[id], "-o", file_path])
