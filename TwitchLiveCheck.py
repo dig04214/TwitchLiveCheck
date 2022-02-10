@@ -140,7 +140,7 @@ class TwitchLiveCheck:
           title = info[id]['title'] if info[id]['title'].replace(' ', '') != '' else 'Untitled'
           game = info[id]['game'] if info[id]['game'] != '' else 'Null'
           filename = id + '-' + datetime.datetime.now().strftime("%Y%m%d_%Hh%Mm%Ss") + '_' + title + '_' + game + '.ts'
-          filename = "".join(x for x in filename if x not in ['\\', '/', ':', '*', '?', '\"', '<', '>', '|'])
+          filename = "".join(x for x in filename if x not in ['\\', '/', ':', '*', '?', '\"', '<', '>', '|', '\n'])
           file_path = os.path.join(self.download_path[id], filename)
           print(file_path)
           self.procs[id] = subprocess.Popen(['streamlink', "--stream-segment-threads", "5", "--stream-segment-attempts" , "5", "--twitch-disable-hosting", "--twitch-disable-ads", 'www.twitch.tv/' + id, self.stream_quality[id], "-o", file_path])
@@ -150,9 +150,9 @@ class TwitchLiveCheck:
       time.sleep(self.refresh)
 
   def check_quality(self, id) -> bool:
-    proc = subprocess.Popen(['streamlink', 'www.twitch.tv/' + id], stdout=subprocess.PIPE, universal_newlines=True)
+    proc = subprocess.run(['streamlink', 'www.twitch.tv/' + id], stdout=subprocess.PIPE, universal_newlines=True)
     # 원하는 화질 없음
-    if proc.stdout.read().find(self.stream_quality[id]) == -1:
+    if proc.stdout.find(self.stream_quality[id]) == -1:
       self.check_num[id] += 1
       print('', id, "stream is online. but", self.stream_quality[id], "quality could not be found. Check:", self.check_num[id])
       
