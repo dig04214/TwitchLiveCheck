@@ -116,7 +116,7 @@ class TwitchLiveCheck:
           res_message = res.json()['message']
           print(f" {res_message}. regenerate token...")
           if self.traceback_log:
-            logging.error(f" {res_message}. regenerate token...")
+            logging.error(f"{res_message}. regenerate token...")
         elif res.status_code == requests.codes.bad_request:
           raise Exception(res.json()['message'])
         elif res.status_code == requests.codes.too_many_requests:
@@ -146,7 +146,7 @@ class TwitchLiveCheck:
     except requests.exceptions.ConnectionError as e:
       print(" requests.exceptions.ConnectionError. Go back checking...")
       if self.traceback_log:
-        logging.error(f'{type(e)} {e}')
+        logging.error(f'{type(e).__name__}: {e}')
       info = {}
     return info
 
@@ -237,13 +237,14 @@ def parsing_arguments() -> argparse.Namespace:
   return args
 
 def main(argv) -> None:
+  '''The following five lines of code are for building exe files. The py file is not used alone.'''
   if getattr(sys, 'frozen', False):
     exec_dir = os.path.dirname(sys.executable)
     sys.path.append(exec_dir)
   else:
     exec_dir = os.path.dirname(__file__)
 
-  print("configKey directory:", exec_dir)
+  
   twitch_check = TwitchLiveCheck()
   args = parsing_arguments()
 
@@ -265,6 +266,7 @@ def main(argv) -> None:
   if args.debug:
     twitch_check.traceback_log = True
   
+  #print("configKey directory:", exec_dir)
   if twitch_check.traceback_log:
     log_format = '%(asctime)s-%(levelname)s-%(name)s-%(message)s'
     logging.basicConfig(filename=f'{exec_dir}/{datetime.datetime.now().strftime("%Y%m%d-%Hh%Mm%Ss")}.log', level=logging.INFO, format=log_format)
