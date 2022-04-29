@@ -71,8 +71,10 @@ class TwitchLiveCheck:
       raise Exception(res.json()['message'])
     elif res.status_code == requests.codes.forbidden:
       raise Exception(res.json()['message'])
-    elif res.status_code == requests.codes.internal_server_error:
-      logging.error(' internal server error(token)')
+    else:
+      print('Can not create token, status code: ', res.status_code)
+      if self.traceback_log:
+        logging.error('server error(token) status code: {}'.format(res.status_code))
     return token
 
   def validate_token(self) -> None:   # app access token 확인
@@ -125,7 +127,7 @@ class TwitchLiveCheck:
             logging.error('Too many request!')
           reset_time = int(res.headers['Ratelimit-Reset'])
           while(True):
-            now_timestamp = time.mktime(datetime.datetime.today().timetuple())
+            now_timestamp = time.time()
             if reset_time < now_timestamp:
               print(' Reset-time! continue to check...')
               if self.traceback_log:
@@ -135,6 +137,10 @@ class TwitchLiveCheck:
               self.check_process()
               print(' Check streamlink process...', 'reset-time:', reset_time, ', now:', now_timestamp)
               time.sleep(self.refresh)
+        elif res.status_code != requests.codes.ok:
+          print(' server error(live)! status_code:', res.status_code)
+          if self.traceback_log:
+            logging.error('server error(live)! status_code: {0} \n message: {1}'.format(res.status_code, res.text))
         elif res.json()['data'] == []:
           pass
         else:
