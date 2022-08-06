@@ -11,7 +11,9 @@
 * 영상 저장 위치 지정
 * streamlink를 활용해 생방송 다운로드
 * 에러 로깅(traceback 활용)
-* argv 기능
+* cli arguments 기능
+* 외부 config 파일 로딩 기능
+* 외부 config 파일을 통한 실행
 ***
 
 # TwitchLiveCheck
@@ -35,16 +37,21 @@
 6. modify the internal variable of `__init__(self)` by referring to the comments
 ```python
 def  __init__(self)  ->  None:
+  self.streamerID = ''   # You can enter up to 100 streamers(api maximum limit), separated by spaces example: "username1 username2 ... "
+  self.quality_by_streamer = {}   # You can enter the streamer-specific quality if necessary. Don't overlap self.streamerID. example: {"username 1":"quality 1", "username 2":"quality 2"}
+  self.quality = 'best'   # Set recording quality.
+  self.refresh = 1.5   # Check interval (in seconds) to check for streams. you can enter decimals
+  self.check_max = 20   # Set the number of times to check the recording quality. If there's no recording quality beyond the number of searches, change the quality to best. you must enter an integer
+  self.root_path = r''   # Set recording path. do not delete thr 'r' character
+  self.traceback_log = True   # if True, save traceback log file
 
-  self.streamerID = ""  # You can enter up to 100 streamers(api maximum limit), separated by spaces example: "username1 username2 ... "
-  self.quality_by_streamer = {}  # You can enter the streamer-specific quality if necessary. Don't overlap self.streamerID. example: {"username 1":"quality 1", "username 2":"quality 2"}
-  self.quality = "1080p60"  # Set recording quality.
-  self.refresh = 1  # Check interval (in seconds) to check for streams. you can enter decimals
-  self.check = 30  # Set the number of times to check the recording quality. If there's no recording quality beyond the number of searches, change the quality to best. you must enter an integer
-  self.root_path = r""  # Set recording path. do not delete thr 'r' character
-  self.traceback_log = False  # if True, save traceback log file
-  self.client_id = ""  # Client ID
-  self.client_secret = ""  # Client Secret
+  self.legacy_func = False   # if True, use legacy quality check functions
+  self.config_path = r''   # set config file path. do not delete thr 'r' character
+
+  self.client_id = ''   # Client ID
+  self.client_secret = ''   # Client Secret
 ```
 7. type `python TwitchLiveCheck.py` in your terminal
 8. if you want to put command line arguments, type `python TwitchLiveCheck.py -h` in your terminal
+9. if you enter the configuration file path, `TwitchLiveCheck` will load the file and fill `__init__` automatically
+10. if you enter the `TwitchLiveCheck.py` path, you can run it through the configuration file.
