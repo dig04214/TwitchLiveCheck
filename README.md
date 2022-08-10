@@ -54,4 +54,4 @@ def  __init__(self)  ->  None:
 7. type `python TwitchLiveCheck.py` in your terminal
 8. if you want to put command line arguments, type `python TwitchLiveCheck.py -h` in your terminal
 9. if you enter the configuration file path, `TwitchLiveCheck` will load the file and fill `__init__` automatically
-10. if you enter the `TwitchLiveCheck.py` path, you can run it through the configuration file.
+10. if you enter the `TwitchLiveCheck.py` path in the configuration file, you can run it through the configuration file.
