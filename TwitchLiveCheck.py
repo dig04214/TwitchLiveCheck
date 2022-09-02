@@ -103,7 +103,7 @@ class TwitchLiveCheck:
       'client_id': self.client_id,
       'token': self.user_token
     }
-    res = requests.post(api, data=payload)
+    res = requests.post(api, json=payload)
     self.print_log(self.logger, 'info', 'app access token revoked')
 
 
@@ -407,6 +407,7 @@ def main(argv) -> None:
       twitch_check.run()
     except:
       file_logger.error(traceback.format_exc())
+      sys.exit()
   else:
     twitch_check.run()
 

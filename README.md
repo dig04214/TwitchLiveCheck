@@ -22,9 +22,9 @@
 2. Download live broadcast using streamlink
 
 
-## requirement:
+## requirements:
 > python 3.6 or later   
-> python request 2.27.1 or later   
+> python requests 2.27.1 or later   
 > streamlink 2.4.0 or later   
 
 
@@ -36,7 +36,7 @@
 5. open `TwitchLiveCheck.py` as your editor
 6. modify the internal variable of `__init__(self)` by referring to the comments
 ```python
-def  __init__(self)  ->  None:
+def __init__(self) -> None:
   self.streamerID = ''   # You can enter up to 100 streamers(api maximum limit), separated by spaces example: "username1 username2 ... "
   self.quality_by_streamer = {}   # You can enter the streamer-specific quality if necessary. Don't overlap self.streamerID. example: {"username 1":"quality 1", "username 2":"quality 2"}
   self.quality = 'best'   # Set recording quality.
@@ -53,5 +53,5 @@ def  __init__(self)  ->  None:
 ```
 7. type `python TwitchLiveCheck.py` in your terminal
 8. if you want to put command line arguments, type `python TwitchLiveCheck.py -h` in your terminal
-9. if you enter the configuration file path, `TwitchLiveCheck` will load the file and fill `__init__` automatically
-10. if you enter the `TwitchLiveCheck.py` path, you can run it through the configuration file.
+9. if you enter the configuration file path to `self.config_path`, `TwitchLiveCheck` will load the file and fill `__init__` automatically
+10. if you enter the `TwitchLiveCheck` path to the configuration file, you can run it through the configuration file.
