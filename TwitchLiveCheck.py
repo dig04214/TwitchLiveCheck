@@ -7,6 +7,7 @@ import time, sys, pathlib, atexit, datetime
 import subprocess
 import argparse, importlib
 import logging, traceback
+from os import getpid
 #import asyncio   # for future version
 
 
@@ -54,6 +55,8 @@ class TwitchLiveCheck:
     proccessed_username = set(self.streamerID.strip().lower().split(' ')) - set(self.quality_by_streamer)
     proccessed_username.discard('')
     self.quality_by_streamer.update(dict.fromkeys(proccessed_username, self.quality))
+    if '' in self.quality_by_streamer:
+      self.quality_by_streamer.pop('')
     self.stream_quality = self.quality_by_streamer
     self.login_name = list(self.quality_by_streamer.keys())
     if self.login_name == []:
@@ -322,7 +325,7 @@ class TwitchLiveCheck:
       for id in self.procs:
         self.procs[id].terminate()
         self.procs[id].poll()
-      self.print_log(self.logger, 'info', 'subprocess terminated')
+      self.print_log(self.logger, 'info', ' subprocess terminated', 'subprocess terminated')
 
 def parsing_arguments() -> argparse.Namespace:
   parser = argparse.ArgumentParser()
@@ -398,11 +401,12 @@ def main(argv) -> None:
   
   if twitch_check.traceback_log:
     file_formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-    file_handler = logging.FileHandler(filename='{}/{}.log'.format(exec_dir, datetime.datetime.now().strftime("%Y%m%d-%Hh%Mm%Ss")), mode='a', encoding='utf-8')
+    file_handler = logging.FileHandler(filename='{}/{}-{}.log'.format(exec_dir, datetime.datetime.now().strftime("%Y%m%d-%Hh%Mm%Ss"), getpid()), mode='a', encoding='utf-8')
     file_handler.setFormatter(file_formatter)
     file_logger.addHandler(file_handler)
     try:
       print("log file directory:", exec_dir)
+      print("pid: ", getpid())
       file_logger.info('logging started')
       twitch_check.run()
     except:
