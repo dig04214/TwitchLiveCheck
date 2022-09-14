@@ -13,7 +13,7 @@ from os import getpid
 
 class TwitchLiveCheck:
   # set the default values
-  def __init__(self, logger: logging.Logger) -> None:
+  def __init__(self) -> None:
     self.streamerID = ''   # You can enter up to 100 streamers(api maximum limit), separated by spaces example: "username1 username2 ... "
     self.quality_by_streamer = {}   # You can enter the streamer-specific quality if necessary. Don't overlap self.streamerID. example: {"username 1":"quality 1", "username 2":"quality 2"}
     self.quality = 'best'   # Set recording quality.
@@ -29,7 +29,7 @@ class TwitchLiveCheck:
     self.client_secret = ''   # Client Secret
 
 #---Do not edit-------------------------------------------------------------------------------------------------------------------
-    self.logger = logger
+    self.logger = logging.getLogger(name='TwitchLiveCheck')
 
   def __repr__(self) -> str:
     variables = vars(self).copy()
@@ -58,6 +58,7 @@ class TwitchLiveCheck:
     if '' in self.quality_by_streamer:
       self.quality_by_streamer.pop('')
     self.stream_quality = self.quality_by_streamer
+    
     self.login_name = list(self.quality_by_streamer.keys())
     if self.login_name == []:
       self.print_log(self.logger, 'error', 'Please enter the streamer username', 'no streamer username')
@@ -166,7 +167,7 @@ class TwitchLiveCheck:
           print('', id, 'is online. Stream recording in session.')
           if(pathlib.Path(self.download_path[id]).is_dir() is False):
             pathlib.Path(self.download_path[id]).mkdir(parents=True, exist_ok=True)
-          title = info[id]['title'] if info[id]['title'].replace(' ', '') != '' else 'Untitled'
+          title = info[id]['title'].replace('}', '}}').replace('{', '{{') if info[id]['title'].replace(' ', '') != '' else 'Untitled'
           game = info[id]['game'] if info[id]['game'] != '' else 'Null'
           filename = id + '-' + datetime.datetime.now().strftime("%Y%m%d_%Hh%Mm%Ss") + '_' + title + '_' + game + '.ts'
           filename = "".join(x for x in filename if x not in escape_str)
@@ -397,7 +398,7 @@ def main(argv) -> None:
     print("TwitchLiveCheck", __version__)
     sys.exit()
 
-  twitch_check = assign_args(args, TwitchLiveCheck(file_logger))
+  twitch_check = assign_args(args, TwitchLiveCheck())
   
   if twitch_check.traceback_log:
     file_formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
