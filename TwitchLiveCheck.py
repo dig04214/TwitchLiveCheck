@@ -174,7 +174,7 @@ class TwitchLiveCheck:
           
           file_path = pathlib.Path(self.download_path[id]).joinpath(filename)
           print(file_path)
-          self.procs[id] = subprocess.Popen(['streamlink', "--stream-segment-threads", "5", "--stream-segment-attempts" , "5", "--twitch-disable-hosting", "--twitch-disable-ads", "--hls-live-restart", 'www.twitch.tv/' + id, self.stream_quality[id], "-o", file_path])  #return code: 3221225786, 130
+          self.procs[id] = subprocess.Popen(['streamlink', "--stream-segment-threads", "5", "--stream-segment-attempts" , "5", "--twitch-disable-ads", "--hls-live-restart", '--hls-live-edge', '6', 'www.twitch.tv/' + id, self.stream_quality[id], "-o", file_path])  #return code: 3221225786, 130
       elif self.login_name != []:
         print('', self.login_name, 'is offline. Check again in', self.refresh, 'seconds.')
       self.check_process()
@@ -185,7 +185,7 @@ class TwitchLiveCheck:
     if self.stream_quality[id] in ['best', 'worst', 'audio_only']:
       return True
 
-    if self.legacy_func == False:
+    if self.legacy_func == True:
       # previous code
       proc = subprocess.run(['streamlink', 'www.twitch.tv/' + id], stdout=subprocess.PIPE, universal_newlines=True)
       streamlink_quality = proc.stdout.split('\n')[-2].split(': ')[-1].replace(' (worst)', '').replace(' (best)', '').split(', ')
