@@ -21,6 +21,8 @@ class TwitchLiveCheck:
     self.check_max = 20   # Set the number of times to check the recording quality. If there's no recording quality beyond the number of searches, change the quality to best. you must enter an integer
     self.root_path = r''   # Set recording path. do not delete thr 'r' character
     self.traceback_log = False   # if True, save traceback log file
+    #self.proxy = ''   # Set proxy. example: "https://example.com or socks5h://example.com"
+    self.quality_in_title = True   # if True, add quality to title
 
     self.legacy_func = False   # if True, use legacy quality check functions
     self.config_path = r''   # set config file path. do not delete thr 'r' character
@@ -46,6 +48,8 @@ class TwitchLiveCheck:
     self.user_token = self.create_token()
     self.download_path = {}
     self.procs = {}
+    self.pat = {}
+    self.available_quality = {}
     atexit.register(self.revoke_token)
     atexit.register(self.terminate_proc)
 
@@ -169,6 +173,8 @@ class TwitchLiveCheck:
 
   def loop_check(self) -> None:
     escape_str = ['\\', '/', ':', '*', '?', '\"', '<', '>', '|', '\a', '\b', '\f', '\n', '\r', '\t', r'\v', r'\u', r'\x', r'\N', r'\U', '\f\r', '\r\n', '\x1c', '\x1d', '\x1e', '\x85', '\u2028', '\u2029']
+    
+
     while True:
       info = self.check_live()
       if info != {}:
@@ -178,12 +184,19 @@ class TwitchLiveCheck:
             pathlib.Path(self.download_path[id]).mkdir(parents=True, exist_ok=True)
           title = info[id]['title'].replace('}', '}}').replace('{', '{{') if info[id]['title'].replace(' ', '') != '' else 'Untitled'
           game = info[id]['game'] if info[id]['game'] != '' else 'Null'
-          filename = id + '-' + datetime.datetime.now().strftime("%Y%m%d_%Hh%Mm%Ss") + '_' + title + '_' + game + '.ts'
+          game = '-'.join((game, self.available_quality[id])) if self.quality_in_title else game
+          filename = '{}-{}_{}_{}.ts'.format(id, datetime.datetime.now().strftime("%Y%m%d_%Hh%Mm%Ss"), title, game)
           filename = "".join(x for x in filename if x not in escape_str)
           
           file_path = pathlib.Path(self.download_path[id]).joinpath(filename)
           print(file_path)
-          self.procs[id] = subprocess.Popen(['streamlink', "--stream-segment-threads", "5", "--stream-segment-attempts" , "5", "--twitch-disable-ads", "--hls-live-restart", '--hls-live-edge', '6', 'www.twitch.tv/' + id, self.stream_quality[id], "-o", file_path])  #return code: 3221225786, 130
+          
+          streamlink_args = ['streamlink', "--stream-segment-threads", "5", "--stream-segment-attempts" , "5", "--twitch-disable-ads", "--hls-live-restart", '--hls-live-edge', '6', 'www.twitch.tv/' + id, self.stream_quality[id], "-o", file_path]
+          #if self.proxy != '':
+            #streamlink_args.insert(1, self.proxy)
+            #streamlink_args.insert(1, '--http-proxy')
+          self.procs[id] = subprocess.Popen(streamlink_args)  #return code: 3221225786, 130
+          self.available_quality.pop(id, 0)
       elif self.login_name != []:
         print('', self.login_name, 'is offline. Check again in', self.refresh, 'seconds.')
       self.check_process()
@@ -191,25 +204,35 @@ class TwitchLiveCheck:
 
   def check_quality(self, id) -> bool:
     # bypass quality check
-    if self.stream_quality[id] in ['best', 'worst', 'audio_only']:
+    if self.stream_quality[id] == 'audio_only':
+      self.available_quality[id] = 'audio_only'
+      return True
+    elif self.stream_quality[id] in ['best', 'worst'] and id in self.available_quality:
       return True
 
     if self.legacy_func == True:
       # previous code
       proc = subprocess.run(['streamlink', 'www.twitch.tv/' + id], stdout=subprocess.PIPE, universal_newlines=True)
-      streamlink_quality = proc.stdout.split('\n')[-2].split(': ')[-1].replace(' (worst)', '').replace(' (best)', '').split(', ')
-      # 원하는 화질 없음
-      if self.stream_quality[id] not in streamlink_quality:
+      streamlink_quality = proc.stdout.split('\n')[-2].split(': ')[-1].replace(' (worst)', '').replace(' (best)', '').replace('audio_only, ', '').split(', ')
+      
+      if self.stream_quality[id] in ['best', 'worst']:
+        self.available_quality[id] = streamlink_quality[-1] if self.stream_quality[id] == 'best' else streamlink_quality[0]
+        return True
+      # if the desired stream quality is not available
+      elif self.stream_quality[id] not in streamlink_quality:
         self.check_num[id] += 1
         print('', id, "stream is online. but", self.stream_quality[id], "quality could not be found. Check:", self.check_num[id])
         
         if self.check_num[id] >= self.check_max:
           self.stream_quality[id] = 'best'
+          self.available_quality[id] = streamlink_quality[-1]
           self.print_log(self.logger, 'info', 'Change {} stream quality to best.'.format(id))
           self.check_num[id] = 0
           return True
         return False
+      # desired stream quality is available
       else:
+        self.available_quality[id] = self.stream_quality[id]
         self.check_num[id] = 0
         return True
     else:
@@ -219,26 +242,47 @@ class TwitchLiveCheck:
       stream_token_query = {"operationName": "PlaybackAccessToken", "extensions": {"persistedQuery": {"version": 1, "sha256Hash": "0828119ded1c13477966434e15800ff57ddacf13ba1911c129dc2200705b0712"}}, "variables": {"isLive": True, "login": str(id), "isVod": False, "vodID": '', "playerType": "embed"}}
       
       # get playback access token and get m3u8
-      playback_token = requests.post(url_gql,json=stream_token_query, headers=twitch_headers)
-      if playback_token.status_code != requests.codes.ok:
-        self.check_num[id] += 1
-        return False
-      else:
-        access_token = playback_token.json()['data']['streamPlaybackAccessToken']
-      params_usher = {'client_id':'kimne78kx3ncx6brgo4mv6wki5h1ko', 'token': access_token['value'], 'sig': access_token['signature'], 'allow_source': True, 'allow_audio_only': True}
+      if id in self.pat:
+        if int(time.time()) >= self.pat[id]['expire']:
+          self.print_log(self.logger, 'info', '', 'Get new PAT for {}.'.format(id))
+          self.pat.pop(id, 0)
+
+      if id not in self.pat:
+        playback_token = requests.post(url_gql,json=stream_token_query, headers=twitch_headers)
+        if playback_token.status_code != requests.codes.ok:
+          self.check_num[id] += 1
+          return False
+        else:
+          access_token = playback_token.json()['data']['streamPlaybackAccessToken']
+          try:
+            token_expire = int(access_token['value'].split(',')[11].split(':')[1])
+            self.pat[id] = {'token': access_token, 'expire': token_expire}
+          except ValueError:
+            if id in self.pat:
+              del self.pat[id]
+            self.print_log(self.logger, 'error', 'PAT expiration time error, Change self.legacy_func to True', 'ValueError: token_expire_time')
+            self.legacy_func = True
+            pass
+      params_usher = {'client_id':'kimne78kx3ncx6brgo4mv6wki5h1ko', 'token': self.pat[id]['token']['value'], 'sig': self.pat[id]['token']['signature'], 'allow_source': True, 'allow_audio_only': True}
       m3u8_data = requests.get(url_usher, params=params_usher)
       live_quality = self.quality_parser(m3u8_data.text)
       
-      # quality check success
-      if self.stream_quality[id] in live_quality:
+      if self.stream_quality[id] in ['best', 'worst']:
+        self.available_quality[id] = live_quality[0] if self.stream_quality[id] == 'best' else live_quality[-1]
+        return True
+      # desired stream quality is available
+      elif self.stream_quality[id] in live_quality:
+        self.available_quality[id] = self.stream_quality[id]
         self.check_num[id] = 0
         return True
+      # if the desired stream quality is not available
       else:
         self.check_num[id] += 1
         print('', id, "stream is online. but", self.stream_quality[id], "quality could not be found. Check:", self.check_num[id])
 
         if self.check_num[id] >= self.check_max:
           self.stream_quality[id] = 'best'
+          self.available_quality[id] = live_quality[0]
           self.print_log(self.logger, 'info', 'Change {} stream quality to best.'.format(id))
           self.check_num[id] = 0
           return True
@@ -312,6 +356,13 @@ class TwitchLiveCheck:
       log = ''
     if self.traceback_log == False or log == '':
       print(str1)
+    elif str1 == '':
+      if log == 'info':
+        logger.info(str2)
+      elif log == 'error':
+        logger.error(str2)
+      else:
+        logger.warning(str2)
     else:
       if log == 'info':
         print(str1)
@@ -327,9 +378,9 @@ class TwitchLiveCheck:
     quality = []
     m3u8_line_split = m3u8.split('\n')
     for m3u8_line in m3u8_line_split:
-      if m3u8_line.find('#EXT-X-MEDIA') != -1:
+      if m3u8_line.find('#EXT-X-MEDIA') != -1 and m3u8_line.find('audio_only') == -1:
         quality.append(m3u8_line.split(',')[2].split('=')[1].replace('"','').replace(' (source)',''))
-    quality.append(['best', 'worst'])
+    #quality.append(['best', 'worst'])
     return quality
 
   def terminate_proc(self) -> None:
