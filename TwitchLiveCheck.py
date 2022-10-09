@@ -74,7 +74,8 @@ class TwitchLiveCheck:
     print("Checking for", self.login_name, "every", self.refresh, "seconds. Record with", self.quality, "quality.")
     self.loop_check()
 
-  def create_token(self) -> str:   # app access token 생성
+  # create app access token
+  def create_token(self) -> str:
     api = 'https://id.twitch.tv/oauth2/token'
     payload = {
       'client_id': self.client_id,
@@ -93,7 +94,8 @@ class TwitchLiveCheck:
       self.print_log(self.logger, 'error', 'Can not create token, status code: {}'.format(res.status_code), 'server error(token) status code: {}'.format(res.status_code))
     return token
 
-  def validate_token(self) -> None:   # app access token 확인
+  # check app access token
+  def validate_token(self) -> None:
     api = 'https://id.twitch.tv/oauth2/validate'
     h = {'Authorization': f'Bearer {self.user_token}'}
     res = requests.get(api, headers=h)
@@ -101,7 +103,8 @@ class TwitchLiveCheck:
       self.print_log(self.logger, 'info', " invalid access token. regenerate token...", 'regenerate token')
       self.user_token = self.create_token()
 
-  def revoke_token(self) -> None:   # app access token 소멸
+  # revoke app access token
+  def revoke_token(self) -> None:
     api = 'https://id.twitch.tv/oauth2/revoke'
     payload = {
       'client_id': self.client_id,
@@ -110,7 +113,7 @@ class TwitchLiveCheck:
     res = requests.post(api, json=payload)
     self.print_log(self.logger, 'info', 'app access token revoked')
 
-
+  # create url params
   def create_params(self, username) -> str:
     params = ''
     for id in username:
@@ -125,12 +128,18 @@ class TwitchLiveCheck:
       info = {}
       if self.login_name != []:
         res = requests.get(api, headers=h)
+
+        # unauthorized : token expired
         if res.status_code == requests.codes.unauthorized:
           self.user_token = self.create_token()
           res_message = res.json()['message']
           self.print_log(self.logger, 'error', f" {res_message}. regenerate token...", f"{res_message}. regenerate token...")
+        
+        # bad_request : invalid client id or client secret
         elif res.status_code == requests.codes.bad_request:
           raise Exception(res.json()['message'])
+        
+        # too_many_requests : api rate limit exceeded wait until reset time
         elif res.status_code == requests.codes.too_many_requests:
           self.print_log(self.logger, 'error', ' Too many request! wait until reset-time...', 'Too many request!')
           reset_time = int(res.headers['Ratelimit-Reset'])
@@ -261,6 +270,7 @@ class TwitchLiveCheck:
       self.url_params = self.create_params(self.login_name)
       id_status = False
 
+  # modify __init__ using config file
   def change_init(self, config: ModuleType) -> bool:
     config_version = 0.1
     if config.__version__ == config_version:
@@ -294,6 +304,7 @@ class TwitchLiveCheck:
       logger.error('Config file is not found. Please check your config file path.')
       sys.exit('Config file is not found.')
 
+  # consolidate console output and logging functions
   def print_log(self, logger: logging.Logger, log: str, str1: str, str2=None) -> None:
     if str2 == None:
       str2 = str1
