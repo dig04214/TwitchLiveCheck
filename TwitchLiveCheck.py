@@ -5,25 +5,24 @@ from types import ModuleType
 import requests
 import time, sys, pathlib, atexit, datetime
 import subprocess
-import argparse, importlib
+import argparse, importlib.util
 import logging, traceback
 from os import getpid
-#import asyncio   # for future version
 
 
 class TwitchLiveCheck:
   # set the default values
   def __init__(self) -> None:
-    self.streamerID = ''   # You can enter up to 100 streamers(api maximum limit), separated by spaces example: "username1 username2 ... "
+    self.streamerID = ''   # You can enter up to 100 streamers(api maximum limit), separated by spaces. example: "username1 username2 ... "
     self.quality_by_streamer = {}   # You can enter the streamer-specific quality if necessary. Don't overlap self.streamerID. example: {"username 1":"quality 1", "username 2":"quality 2"}
     self.quality = 'best'   # Set recording quality.
     self.refresh = 1.5   # Check interval (in seconds) to check for streams. you can enter decimals
     self.check_max = 20   # Set the number of times to check the recording quality. If there's no recording quality beyond the number of searches, change the quality to best. you must enter an integer
     self.root_path = r''   # Set recording path. do not delete thr 'r' character
     self.traceback_log = False   # if True, save traceback log file
-    #self.proxy = ''   # Set proxy. example: "https://example.com or socks5h://example.com"
-    self.quality_in_title = True   # if True, add quality to title
+    self.quality_in_title = False   # if True, add quality to title
 
+    self.custom_options = ''   # cli options for streamlink, separated by spaces. example: 'option1 value1 option2 value2 ... '
     self.legacy_func = False   # if True, use legacy quality check functions
     self.config_path = r''   # set config file path. do not delete thr 'r' character
 
@@ -39,10 +38,6 @@ class TwitchLiveCheck:
     return '{}({})'.format(self.__class__.__name__, variables)
 
   def run(self) -> None:
-    # load config file
-    if self.config_path != '':
-      config = self.dynamic_import(self.config_path, self.logger)
-      self.change_init(config)
 
     #self.print_log(self.logger, 'info', self)
     self.user_token = self.create_token()
@@ -59,23 +54,24 @@ class TwitchLiveCheck:
     proccessed_username = set(self.streamerID.strip().lower().split(' ')) - set(self.quality_by_streamer)
     proccessed_username.discard('')
     self.quality_by_streamer.update(dict.fromkeys(proccessed_username, self.quality))
+    del proccessed_username
     if '' in self.quality_by_streamer:
       self.quality_by_streamer.pop('')
     self.stream_quality = self.quality_by_streamer
     
-    self.login_name = list(self.quality_by_streamer.keys())
-    if self.login_name == []:
+    self.streamerID = list(self.quality_by_streamer.keys())
+    if self.streamerID == []:
       self.print_log(self.logger, 'error', 'Please enter the streamer username', 'no streamer username')
       raise Exception('Please enter the streamer username')
-    self.check_num = dict.fromkeys(self.login_name, 0)
+    self.check_num = dict.fromkeys(self.streamerID, 0)
     
-    for id in self.login_name:
+    for id in self.streamerID:
       self.download_path[id] = pathlib.Path(self.root_path).joinpath(id)
       if(pathlib.Path(self.download_path[id]).is_dir() is False):
         pathlib.Path(self.download_path[id]).mkdir(parents=True, exist_ok=True)
-        
-    self.url_params = self.create_params(self.login_name)
-    print("Checking for", self.login_name, "every", self.refresh, "seconds. Record with", self.quality, "quality.")
+    del self.root_path
+    self.url_params = self.create_params(self.streamerID)
+    print("Checking for", self.streamerID, "every", self.refresh, "seconds. Record with", self.quality, "quality.")
     self.loop_check()
 
   # create app access token
@@ -130,7 +126,7 @@ class TwitchLiveCheck:
       api = 'https://api.twitch.tv/helix/streams?' + self.url_params
       h = {'Authorization': f'Bearer {self.user_token}', 'Client-Id': self.client_id}
       info = {}
-      if self.login_name != []:
+      if self.streamerID != []:
         res = requests.get(api, headers=h)
 
         # unauthorized : token expired
@@ -164,8 +160,8 @@ class TwitchLiveCheck:
           for i in res.json()['data']:
             if self.check_quality(i['user_login']):
               info[i['user_login']] = {'title': i['title'], 'game': i['game_name']}
-              self.login_name.remove(i['user_login'])
-          self.url_params = self.create_params(self.login_name)
+              self.streamerID.remove(i['user_login'])
+          self.url_params = self.create_params(self.streamerID)
     except requests.exceptions.ConnectionError as e:
       self.print_log(self.logger, 'error', " requests.exceptions.ConnectionError. Go back checking...", f'{type(e).__name__}: {e}')
       info = {}
@@ -173,8 +169,6 @@ class TwitchLiveCheck:
 
   def loop_check(self) -> None:
     escape_str = ['\\', '/', ':', '*', '?', '\"', '<', '>', '|', '\a', '\b', '\f', '\n', '\r', '\t', r'\v', r'\u', r'\x', r'\N', r'\U', '\f\r', '\r\n', '\x1c', '\x1d', '\x1e', '\x85', '\u2028', '\u2029']
-    
-
     while True:
       info = self.check_live()
       if info != {}:
@@ -187,18 +181,19 @@ class TwitchLiveCheck:
           game = '-'.join((game, self.available_quality[id])) if self.quality_in_title else game
           filename = '{}-{}_{}_{}.ts'.format(id, datetime.datetime.now().strftime("%Y%m%d_%Hh%Mm%Ss"), title, game)
           filename = "".join(x for x in filename if x not in escape_str)
-          
           file_path = pathlib.Path(self.download_path[id]).joinpath(filename)
           print(file_path)
           
-          streamlink_args = ['streamlink', "--stream-segment-threads", "5", "--stream-segment-attempts" , "5", "--twitch-disable-ads", "--hls-live-restart", '--hls-live-edge', '6', 'www.twitch.tv/' + id, self.stream_quality[id], "-o", file_path]
-          #if self.proxy != '':
-            #streamlink_args.insert(1, self.proxy)
-            #streamlink_args.insert(1, '--http-proxy')
-          self.procs[id] = subprocess.Popen(streamlink_args)  #return code: 3221225786, 130
+          self.streamlink_args = ['streamlink', "--stream-segment-threads", "5", "--stream-segment-attempts" , "5", "--twitch-disable-ads", "--hls-live-restart", '--hls-live-edge', '6', 'www.twitch.tv/' + id, self.stream_quality[id], "-o", file_path]
+          if self.custom_options != '' and type(self.custom_options) == str:
+              self.custom_options = self.custom_options.strip().replace(',', '').split(' ')
+              for option in reversed(self.custom_options):
+                self.streamlink_args.insert(1, option)
+          self.procs[id] = subprocess.Popen(self.streamlink_args)  #return code: 3221225786, 130
           self.available_quality.pop(id, 0)
-      elif self.login_name != []:
-        print('', self.login_name, 'is offline. Check again in', self.refresh, 'seconds.')
+      elif self.streamerID != []:
+        print('', self.streamerID, 'is offline. Check again in', self.refresh, 'seconds.')
+        #print('Now Online:', list(self.procs.keys()))
       self.check_process()
       time.sleep(self.refresh)
 
@@ -300,24 +295,25 @@ class TwitchLiveCheck:
           # 정상 종료
           print('', id, "stream is done. Go back checking...")
           del self.procs[id]
-          self.login_name.append(id)
+          self.streamerID.append(id)
           self.stream_quality[id] = self.quality_by_streamer[id]
           id_status = True
         else:
           # 비정상 종료
           print('', id, "stream error. Error code:", proc_code)
           del self.procs[id]
-          self.login_name.append(id)
+          self.streamerID.append(id)
           self.stream_quality[id] = self.quality_by_streamer[id]
           id_status = True
     if id_status is True:
-      self.url_params = self.create_params(self.login_name)
+      self.url_params = self.create_params(self.streamerID)
       id_status = False
 
   # modify __init__ using config file
   def change_init(self, config: ModuleType) -> bool:
-    config_version = 0.1
-    if config.__version__ == config_version:
+    config_version = 0.2
+    compatible_version = [0.1, 0.2]
+    if config.__version__ in compatible_version:
       self.streamerID = config.streamerID
       self.quality_by_streamer = config.quality_by_streamer
       self.quality = config.quality
@@ -325,6 +321,8 @@ class TwitchLiveCheck:
       self.check_max = config.check_max
       self.root_path = config.root_path
       self.traceback_log = config.traceback_log
+      self.quality_in_title = config.quality_in_title if config.__version__ >= 0.2 else self.quality_in_title
+      self.custom_options = config.custom_options if config.__version__ >= 0.2 else self.custom_options
       self.legacy_func = config.legacy_func
       self.client_id = config.client_id
       self.client_secret = config.client_secret
@@ -403,6 +401,8 @@ def parsing_arguments() -> argparse.Namespace:
   parser.add_argument("-d", "--debug", action="store_true", help="Set the logging option")
   parser.add_argument("-lf", "--legacy-function", action="store_true", help="Set the legacy option")
   parser.add_argument("-c", "--config", type=pathlib.Path, help="Enter the config file path")
+  parser.add_argument("-qt", "--quality-in-title", action="store_true", help="Set the quality in title option")
+  parser.add_argument("-co", "--custom-options", type=str, help="Enter the custom options")
   args = parser.parse_args()
   return args
 
@@ -439,11 +439,15 @@ def assign_args(args: argparse.Namespace, twitch_check: TwitchLiveCheck) -> Twit
     twitch_check.traceback_log = True
   if args.legacy_function:
     twitch_check.legacy_func = True
+  if args.quality_in_title:
+    twitch_check.quality_in_title = True
+  if args.custom_options != None:
+    twitch_check.custom_options = args.custom_options
   return twitch_check
 
 def main(argv) -> None:
   exec_dir = get_exec_dir()
-  __version__ = '0.1.8'
+  __version__ = '0.2.0'
 
   file_logger = logging.getLogger(name='TwitchLiveCheck')
   file_logger.setLevel(logging.INFO)
@@ -461,16 +465,22 @@ def main(argv) -> None:
     sys.exit()
 
   twitch_check = assign_args(args, TwitchLiveCheck())
+
+  if twitch_check.config_path != '':
+    config = twitch_check.dynamic_import(twitch_check.config_path, twitch_check.logger)
+    twitch_check.change_init(config)
+    twitch_check.config_path = ''
+    del config
   
   if twitch_check.traceback_log:
     file_formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
     file_handler = logging.FileHandler(filename='{}/{}-{}.log'.format(exec_dir, datetime.datetime.now().strftime("%Y%m%d-%Hh%Mm%Ss"), getpid()), mode='a', encoding='utf-8')
     file_handler.setFormatter(file_formatter)
     file_logger.addHandler(file_handler)
+    print("log file directory:", exec_dir)
+    print("pid: ", getpid())
+    file_logger.info('logging started')
     try:
-      print("log file directory:", exec_dir)
-      print("pid: ", getpid())
-      file_logger.info('logging started')
       twitch_check.run()
     except:
       file_logger.error(traceback.format_exc())

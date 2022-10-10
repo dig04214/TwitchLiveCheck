@@ -6,7 +6,9 @@ refresh = 1.5   # Check interval (in seconds) to check for streams. you can ente
 check_max = 20   # Set the number of times to check the recording quality. If there's no recording quality beyond the number of searches, change the quality to best. you must enter an integer
 root_path = r""   # Set recording path. do not delete thr 'r' character
 traceback_log = False   # if True, save traceback log file
+quality_in_title = False   # if True, add quality to title
 
+custom_options = ''   # cli options for streamlink, separated by spaces. example: 'option1 value1 option2 value2 ... '
 legacy_func = False   # if True, use legacy quality check functions
 
 client_id = ""   # Client ID
@@ -15,7 +17,7 @@ client_secret = ""   # Client Secret
 twitch_live_check_path = r''   # set the TwitchLiveCheck path. do not delete the 'r' character
 
 # --- Do not edit --------------------------------------------------------------
-__version__ = 0.1
+__version__ = 0.2
 
 
 if __name__ == '__main__':

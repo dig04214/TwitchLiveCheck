@@ -129,8 +129,8 @@ dmypy.json
 .pyre/
 
 # test config py
-configKey.py
-test.py
+configKey*
+test*
 
 # logging
 *.txt
