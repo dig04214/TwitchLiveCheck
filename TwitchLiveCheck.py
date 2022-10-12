@@ -35,16 +35,16 @@ class TwitchLiveCheck:
   def __repr__(self) -> str:
     variables = vars(self).copy()
     variables.update({'client_id': '******', 'client_secret': '******'})   # for security
-    return '{}({})'.format(self.__class__.__name__, variables)
+    return 'Client ID and Client Secret is hidden for security.\n{}({})'.format(self.__class__.__name__, variables)
 
   def run(self) -> None:
 
     #self.print_log(self.logger, 'info', self)
     self.user_token = self.create_token()
-    self.download_path = {}
-    self.procs = {}
-    self.pat = {}
-    self.available_quality = {}
+    self.download_path = dict()
+    self.procs = dict()
+    self.pat = dict()
+    self.available_quality = dict()
     atexit.register(self.revoke_token)
     atexit.register(self.terminate_proc)
 
@@ -70,6 +70,23 @@ class TwitchLiveCheck:
       if(pathlib.Path(self.download_path[id]).is_dir() is False):
         pathlib.Path(self.download_path[id]).mkdir(parents=True, exist_ok=True)
     del self.root_path
+
+    # apply custom options to streamlink
+    self.streamlink_args = ['streamlink', "--stream-segment-threads", "5", "--stream-segment-attempts" , "5", "--twitch-disable-ads", "--hls-live-restart", '--hls-live-edge', '6']
+    self.streamlink_quality_args = ['streamlink']
+    if self.custom_options != '':
+        self.custom_options = self.custom_options.strip().replace(',', '').split(' ')
+        if '--http-proxy' in self.custom_options:
+          self.legacy_func = True
+          self.streamlink_quality_args.append('--http-proxy')
+          self.streamlink_quality_args.append(self.custom_options[self.custom_options.index('--http-proxy') + 1])
+        if '--http-pac-url' in self.custom_options:
+          self.legacy_func = True
+          self.streamlink_quality_args.append('--http-pac-url')
+          self.streamlink_quality_args.append(self.custom_options[self.custom_options.index('--http-pac-url') + 1])
+        for option in reversed(self.custom_options):
+          self.streamlink_args.insert(1, option)
+
     self.url_params = self.create_params(self.streamerID)
     print("Checking for", self.streamerID, "every", self.refresh, "seconds. Record with", self.quality, "quality.")
     self.loop_check()
@@ -125,7 +142,7 @@ class TwitchLiveCheck:
     try:
       api = 'https://api.twitch.tv/helix/streams?' + self.url_params
       h = {'Authorization': f'Bearer {self.user_token}', 'Client-Id': self.client_id}
-      info = {}
+      info = dict()
       if self.streamerID != []:
         res = requests.get(api, headers=h)
 
@@ -177,19 +194,15 @@ class TwitchLiveCheck:
           if(pathlib.Path(self.download_path[id]).is_dir() is False):
             pathlib.Path(self.download_path[id]).mkdir(parents=True, exist_ok=True)
           title = info[id]['title'].replace('}', '}}').replace('{', '{{') if info[id]['title'].replace(' ', '') != '' else 'Untitled'
+          title = "".join(x for x in title if x not in escape_str)
           game = info[id]['game'] if info[id]['game'] != '' else 'Null'
+          game = "".join(x for x in game if x not in escape_str)
           game = '-'.join((game, self.available_quality[id])) if self.quality_in_title else game
           filename = '{}-{}_{}_{}.ts'.format(id, datetime.datetime.now().strftime("%Y%m%d_%Hh%Mm%Ss"), title, game)
-          filename = "".join(x for x in filename if x not in escape_str)
           file_path = pathlib.Path(self.download_path[id]).joinpath(filename)
           print(file_path)
           
-          self.streamlink_args = ['streamlink', "--stream-segment-threads", "5", "--stream-segment-attempts" , "5", "--twitch-disable-ads", "--hls-live-restart", '--hls-live-edge', '6', 'www.twitch.tv/' + id, self.stream_quality[id], "-o", file_path]
-          if self.custom_options != '' and type(self.custom_options) == str:
-              self.custom_options = self.custom_options.strip().replace(',', '').split(' ')
-              for option in reversed(self.custom_options):
-                self.streamlink_args.insert(1, option)
-          self.procs[id] = subprocess.Popen(self.streamlink_args)  #return code: 3221225786, 130
+          self.procs[id] = subprocess.Popen(self.streamlink_args + ['www.twitch.tv/' + id, self.stream_quality[id], "-o", file_path])  #return code: 3221225786, 130
           self.available_quality.pop(id, 0)
       elif self.streamerID != []:
         print('', self.streamerID, 'is offline. Check again in', self.refresh, 'seconds.')
@@ -207,7 +220,7 @@ class TwitchLiveCheck:
 
     if self.legacy_func == True:
       # previous code
-      proc = subprocess.run(['streamlink', 'www.twitch.tv/' + id], stdout=subprocess.PIPE, universal_newlines=True)
+      proc = subprocess.run(self.streamlink_quality_args + ['www.twitch.tv/' + id], stdout=subprocess.PIPE, universal_newlines=True)
       streamlink_quality = proc.stdout.split('\n')[-2].split(': ')[-1].replace(' (worst)', '').replace(' (best)', '').replace('audio_only, ', '').split(', ')
       
       if self.stream_quality[id] in ['best', 'worst']:
@@ -230,6 +243,7 @@ class TwitchLiveCheck:
         self.available_quality[id] = self.stream_quality[id]
         self.check_num[id] = 0
         return True
+
     else:
       twitch_headers = {'Client-id': 'kimne78kx3ncx6brgo4mv6wki5h1ko', 'user-agent': 'Mozilla/5.0'}
       url_gql = 'https://gql.twitch.tv/gql'
