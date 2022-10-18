@@ -80,10 +80,6 @@ class TwitchLiveCheck:
           self.legacy_func = True
           self.streamlink_quality_args.append('--http-proxy')
           self.streamlink_quality_args.append(self.custom_options[self.custom_options.index('--http-proxy') + 1])
-        if '--http-pac-url' in self.custom_options:
-          self.legacy_func = True
-          self.streamlink_quality_args.append('--http-pac-url')
-          self.streamlink_quality_args.append(self.custom_options[self.custom_options.index('--http-pac-url') + 1])
         for option in reversed(self.custom_options):
           self.streamlink_args.insert(1, option)
 
@@ -204,6 +200,7 @@ class TwitchLiveCheck:
           
           self.procs[id] = subprocess.Popen(self.streamlink_args + ['www.twitch.tv/' + id, self.stream_quality[id], "-o", file_path])  #return code: 3221225786, 130
           self.available_quality.pop(id, 0)
+          self.print_log(self.logger, 'info', None, '{} stream recording in session.'.format(id))
       elif self.streamerID != []:
         print('', self.streamerID, 'is offline. Check again in', self.refresh, 'seconds.')
         #print('Now Online:', list(self.procs.keys()))
@@ -215,6 +212,9 @@ class TwitchLiveCheck:
     if self.stream_quality[id] == 'audio_only':
       self.available_quality[id] = 'audio_only'
       return True
+    elif self.quality_in_title == False and self.stream_quality[id] in ['best', 'worst']:
+      self.available_quality[id] = self.stream_quality[id]
+      return True
     elif self.stream_quality[id] in ['best', 'worst'] and id in self.available_quality:
       return True
 
@@ -222,7 +222,8 @@ class TwitchLiveCheck:
       # previous code
       proc = subprocess.run(self.streamlink_quality_args + ['www.twitch.tv/' + id], stdout=subprocess.PIPE, universal_newlines=True)
       streamlink_quality = proc.stdout.split('\n')[-2].split(': ')[-1].replace(' (worst)', '').replace(' (best)', '').replace('audio_only, ', '').split(', ')
-      
+      self.print_log(self.logger, 'info', None, 'Available streamlink quality of {} : {}'.format(id, streamlink_quality))
+
       if self.stream_quality[id] in ['best', 'worst']:
         self.available_quality[id] = streamlink_quality[-1] if self.stream_quality[id] == 'best' else streamlink_quality[0]
         return True
@@ -275,7 +276,8 @@ class TwitchLiveCheck:
       params_usher = {'client_id':'kimne78kx3ncx6brgo4mv6wki5h1ko', 'token': self.pat[id]['token']['value'], 'sig': self.pat[id]['token']['signature'], 'allow_source': True, 'allow_audio_only': True}
       m3u8_data = requests.get(url_usher, params=params_usher)
       live_quality = self.quality_parser(m3u8_data.text)
-      
+      self.print_log(self.logger, 'info', None, 'Available ttvnw quality of {} : {}'.format(id, live_quality))
+
       if self.stream_quality[id] in ['best', 'worst']:
         self.available_quality[id] = live_quality[0] if self.stream_quality[id] == 'best' else live_quality[-1]
         return True
@@ -311,6 +313,7 @@ class TwitchLiveCheck:
           del self.procs[id]
           self.streamerID.append(id)
           self.stream_quality[id] = self.quality_by_streamer[id]
+          self.print_log(self.logger, 'info', None, '{} stream is done.'.format(id))
           id_status = True
         else:
           # 비정상 종료
@@ -318,6 +321,7 @@ class TwitchLiveCheck:
           del self.procs[id]
           self.streamerID.append(id)
           self.stream_quality[id] = self.quality_by_streamer[id]
+          self.print_log(self.logger, 'info', None, '{} stream is done.'.format(id))
           id_status = True
     if id_status is True:
       self.url_params = self.create_params(self.streamerID)
@@ -364,6 +368,8 @@ class TwitchLiveCheck:
   def print_log(self, logger: logging.Logger, log: str, str1: str, str2=None) -> None:
     if str2 == None:
       str2 = str1
+    if str1 == None:
+      str1 = ''
     if log == 'None' or log == 'none':
       log = ''
     if self.traceback_log == False or log == '':
@@ -497,6 +503,7 @@ def main(argv) -> None:
     try:
       twitch_check.run()
     except:
+      file_logger.info(twitch_check)
       file_logger.error(traceback.format_exc())
       sys.exit()
   else:
