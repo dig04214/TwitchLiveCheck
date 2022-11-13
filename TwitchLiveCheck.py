@@ -4,7 +4,7 @@
 from types import ModuleType
 import requests
 import time, sys, pathlib, atexit, datetime
-import subprocess
+import subprocess, shlex
 import argparse, importlib.util
 import logging, traceback
 from os import getpid
@@ -20,12 +20,12 @@ class TwitchLiveCheck:
     self.check_max = 20   # Set the number of times to check the recording quality. If there's no recording quality beyond the number of searches, change the quality to best. you must enter an integer
     self.root_path = r''   # Set recording path. do not delete thr 'r' character
     self.traceback_log = False   # if True, save traceback log file
-    self.quality_in_title = False   # if True, add quality to title
-
+    self.quality_in_title = False   # if True, add quality info to title
     self.custom_options = ''   # cli options for streamlink, separated by spaces. example: 'option1 value1 option2 value2 ... '
     self.legacy_func = False   # if True, use legacy quality check functions
     self.config_path = r''   # set config file path. do not delete thr 'r' character
 
+    self.oauth = ''   # your OAuth token.
     self.client_id = ''   # Client ID
     self.client_secret = ''   # Client Secret
 
@@ -33,59 +33,79 @@ class TwitchLiveCheck:
     self.logger = logging.getLogger(name='TwitchLiveCheck')
 
   def __repr__(self) -> str:
+    private_information = ['client_id', 'client_secret', 'user_token', 'download_path', 'pat']
     variables = vars(self).copy()
-    variables.update({'client_id': '******', 'client_secret': '******'})   # for security
-    return 'Client ID and Client Secret is hidden for security.\n{}({})'.format(self.__class__.__name__, variables)
+    variables.update(dict.fromkeys(private_information, '******'))   # for security
+    if 'streamlink_args' in variables.keys():
+      if '--twitch-api-header' in variables['streamlink_args']:
+        variables['streamlink_args'][variables['streamlink_args'].index('--twitch-api-header') + 1] = '******'
+    return 'Some information is hidden for security.\n{}({})'.format(self.__class__.__name__, variables)
 
   def run(self) -> None:
-
+    
     #self.print_log(self.logger, 'info', self)
     self.user_token = self.create_token()
+    self.make_vars()
+    atexit.register(self.revoke_token)
+    atexit.register(self.terminate_proc)
+
+    self.process_username()
+    self.make_streamer_list()
+    self.make_path()
+
+    self.make_streamlink_args()
+
+    self.url_params = self.create_params(self.streamerID)
+    print("Checking for", self.streamerID, "every", self.refresh, "seconds. Record with", self.quality, "quality.")
+    self.loop_check()
+
+  def make_streamlink_args(self):
+    # apply custom options to streamlink
+    self.streamlink_args = ['streamlink', "--stream-segment-threads", "5", "--stream-segment-attempts" , "5", "--twitch-disable-ads", "--hls-live-restart", '--hls-live-edge', '6']
+    self.streamlink_quality_args = ['streamlink']
+    if self.oauth != '':
+      self.streamlink_args.extend(['--twitch-api-header', 'Authorization=OAuth {}'.format(self.oauth.strip())])
+      del self.oauth
+    if self.custom_options != '':
+      #self.custom_options = self.custom_options.strip().replace(',', '').split(' ')
+      self.custom_options = shlex.split(self.custom_options.strip().replace(',', ''), posix=True)
+      if '--http-proxy' in self.custom_options:
+        self.legacy_func = True
+        self.streamlink_quality_args.append('--http-proxy')
+        self.streamlink_quality_args.append(self.custom_options[self.custom_options.index('--http-proxy') + 1])
+      self.streamlink_args.extend(self.custom_options)
+
+  def make_vars(self):
     self.download_path = dict()
     self.procs = dict()
     self.pat = dict()
     self.available_quality = dict()
-    atexit.register(self.revoke_token)
-    atexit.register(self.terminate_proc)
 
+  def process_username(self) -> None:
     # change username to lowercase
     for id in list(self.quality_by_streamer.keys()):
       self.quality_by_streamer[id.lower()] = self.quality_by_streamer.pop(id)
-    proccessed_username = set(self.streamerID.strip().lower().split(' ')) - set(self.quality_by_streamer)
-    proccessed_username.discard('')
-    self.quality_by_streamer.update(dict.fromkeys(proccessed_username, self.quality))
-    del proccessed_username
+    processed_username = set(self.streamerID.strip().lower().split(' ')) - set(self.quality_by_streamer)
+    processed_username.discard('')
+    self.quality_by_streamer.update(dict.fromkeys(processed_username, self.quality))
+    del processed_username
     if '' in self.quality_by_streamer:
       self.quality_by_streamer.pop('')
     self.stream_quality = self.quality_by_streamer
-    
+
+  def make_streamer_list(self) -> None:
     self.streamerID = list(self.quality_by_streamer.keys())
     if self.streamerID == []:
       self.print_log(self.logger, 'error', 'Please enter the streamer username', 'no streamer username')
       raise Exception('Please enter the streamer username')
     self.check_num = dict.fromkeys(self.streamerID, 0)
-    
+  
+  def make_path(self):
     for id in self.streamerID:
       self.download_path[id] = pathlib.Path(self.root_path).joinpath(id)
       if(pathlib.Path(self.download_path[id]).is_dir() is False):
         pathlib.Path(self.download_path[id]).mkdir(parents=True, exist_ok=True)
     del self.root_path
-
-    # apply custom options to streamlink
-    self.streamlink_args = ['streamlink', "--stream-segment-threads", "5", "--stream-segment-attempts" , "5", "--twitch-disable-ads", "--hls-live-restart", '--hls-live-edge', '6']
-    self.streamlink_quality_args = ['streamlink']
-    if self.custom_options != '':
-        self.custom_options = self.custom_options.strip().replace(',', '').split(' ')
-        if '--http-proxy' in self.custom_options:
-          self.legacy_func = True
-          self.streamlink_quality_args.append('--http-proxy')
-          self.streamlink_quality_args.append(self.custom_options[self.custom_options.index('--http-proxy') + 1])
-        for option in reversed(self.custom_options):
-          self.streamlink_args.insert(1, option)
-
-    self.url_params = self.create_params(self.streamerID)
-    print("Checking for", self.streamerID, "every", self.refresh, "seconds. Record with", self.quality, "quality.")
-    self.loop_check()
 
   # create app access token
   def create_token(self) -> str:
@@ -201,7 +221,7 @@ class TwitchLiveCheck:
           self.procs[id] = subprocess.Popen(self.streamlink_args + ['www.twitch.tv/' + id, self.stream_quality[id], "-o", file_path])  #return code: 3221225786, 130
           self.available_quality.pop(id, 0)
           self.print_log(self.logger, 'info', None, '{} stream recording in session.'.format(id))
-      elif self.streamerID != []:
+      if self.streamerID != []:
         print('', self.streamerID, 'is offline. Check again in', self.refresh, 'seconds.')
         #print('Now Online:', list(self.procs.keys()))
       self.check_process()
@@ -329,8 +349,8 @@ class TwitchLiveCheck:
 
   # modify __init__ using config file
   def change_init(self, config: ModuleType) -> bool:
-    config_version = 0.2
-    compatible_version = [0.1, 0.2]
+    config_version = 0.3
+    compatible_version = [0.1, 0.2, 0.3]
     if config.__version__ in compatible_version:
       self.streamerID = config.streamerID
       self.quality_by_streamer = config.quality_by_streamer
@@ -342,6 +362,7 @@ class TwitchLiveCheck:
       self.quality_in_title = config.quality_in_title if config.__version__ >= 0.2 else self.quality_in_title
       self.custom_options = config.custom_options if config.__version__ >= 0.2 else self.custom_options
       self.legacy_func = config.legacy_func
+      self.oauth = config.oauth if config.__version__ >= 0.3 else self.oauth
       self.client_id = config.client_id
       self.client_secret = config.client_secret
       self.print_log(self.logger, 'info', 'load the config file')
@@ -373,13 +394,18 @@ class TwitchLiveCheck:
     if log == 'None' or log == 'none':
       log = ''
     if self.traceback_log == False or log == '':
-      print(str1)
+      if str1 == '':
+        pass
+      else:
+        print(str1)
     elif str1 == '':
       if log == 'info':
         logger.info(str2)
       elif log == 'error':
+        print(str2)
         logger.error(str2)
       else:
+        print(str2)
         logger.warning(str2)
     else:
       if log == 'info':
@@ -423,6 +449,7 @@ def parsing_arguments() -> argparse.Namespace:
   parser.add_argument("-c", "--config", type=pathlib.Path, help="Enter the config file path")
   parser.add_argument("-qt", "--quality-in-title", action="store_true", help="Set the quality in title option")
   parser.add_argument("-co", "--custom-options", type=str, help="Enter the custom options")
+  parser.add_argument("-a", "--oauth", type=str, help="Enter the oauth token")
   args = parser.parse_args()
   return args
 
@@ -463,11 +490,13 @@ def assign_args(args: argparse.Namespace, twitch_check: TwitchLiveCheck) -> Twit
     twitch_check.quality_in_title = True
   if args.custom_options != None:
     twitch_check.custom_options = args.custom_options
+  if args.oauth != None:
+    twitch_check.oauth = args.oauth
   return twitch_check
 
 def main(argv) -> None:
   exec_dir = get_exec_dir()
-  __version__ = '0.2.0'
+  __version__ = '0.2.2'
 
   file_logger = logging.getLogger(name='TwitchLiveCheck')
   file_logger.setLevel(logging.INFO)
@@ -508,7 +537,6 @@ def main(argv) -> None:
       sys.exit()
   else:
     twitch_check.run()
-
 
 if __name__ == '__main__':
   main(sys.argv[1:])

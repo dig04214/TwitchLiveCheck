@@ -24,7 +24,7 @@
 
 ## requirements:
 > python 3.6 or later   
-> python requests 2.27.1 or later   
+> python requests 5.0.1 or later   
 > streamlink 2.4.0 or later   
 
 
@@ -44,7 +44,7 @@ def __init__(self) -> None:
   self.check_max = 20   # Set the number of times to check the recording quality. If there's no recording quality beyond the number of searches, change the quality to best. you must enter an integer
   self.root_path = r''   # Set recording path. do not delete thr 'r' character
   self.traceback_log = True   # if True, save traceback log file
-  self.quality_in_title = False   # if True, add quality to title
+  self.quality_in_title = False   # if True, add quality info to title
 
   self.custom_options = ''   # cli options for streamlink, separated by spaces. example: 'option1 value1 option2 value2 ... '
   self.legacy_func = False   # if True, use legacy quality check functions
