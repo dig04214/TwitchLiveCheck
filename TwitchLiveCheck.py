@@ -244,7 +244,10 @@ class TwitchLiveCheck:
       streamlink_quality = proc.stdout.split('\n')[-2].split(': ')[-1].replace(' (worst)', '').replace(' (best)', '').replace('audio_only, ', '').split(', ')
       self.print_log(self.logger, 'info', None, 'Available streamlink quality of {} : {}'.format(id, streamlink_quality))
 
-      if self.stream_quality[id] in ['best', 'worst']:
+      if streamlink_quality == []:
+        self.check_num[id] += 1
+        return False
+      elif self.stream_quality[id] in ['best', 'worst']:
         self.available_quality[id] = streamlink_quality[-1] if self.stream_quality[id] == 'best' else streamlink_quality[0]
         return True
       # if the desired stream quality is not available
@@ -298,7 +301,10 @@ class TwitchLiveCheck:
       live_quality = self.quality_parser(m3u8_data.text)
       self.print_log(self.logger, 'info', None, 'Available ttvnw quality of {} : {}'.format(id, live_quality))
 
-      if self.stream_quality[id] in ['best', 'worst']:
+      if live_quality == []:
+        self.check_num[id] += 1
+        return False
+      elif self.stream_quality[id] in ['best', 'worst']:
         self.available_quality[id] = live_quality[0] if self.stream_quality[id] == 'best' else live_quality[-1]
         return True
       # desired stream quality is available
@@ -329,19 +335,19 @@ class TwitchLiveCheck:
           pass
         elif proc_code == 0:
           # 정상 종료
-          print('', id, "stream is done. Go back checking...")
+          #print('', id, "stream is done. Go back checking...")
           del self.procs[id]
           self.streamerID.append(id)
           self.stream_quality[id] = self.quality_by_streamer[id]
-          self.print_log(self.logger, 'info', None, '{} stream is done.'.format(id))
+          self.print_log(self.logger, 'info', ' {} stream is done. Go back checking...'.format(id), '{} stream is done.'.format(id))
           id_status = True
         else:
           # 비정상 종료
-          print('', id, "stream error. Error code:", proc_code)
+          #print('', id, "stream error. Error code:", proc_code)
           del self.procs[id]
           self.streamerID.append(id)
           self.stream_quality[id] = self.quality_by_streamer[id]
-          self.print_log(self.logger, 'info', None, '{} stream is done.'.format(id))
+          self.print_log(self.logger, 'info', ' {} stream error. Error code: {}'.format(id, proc_code), '{} stream is done. status: {}'.format(id, proc_code))
           id_status = True
     if id_status is True:
       self.url_params = self.create_params(self.streamerID)
@@ -529,7 +535,11 @@ def main(argv) -> None:
     print("log file directory:", exec_dir)
     print("pid: ", getpid())
     file_logger.info('logging started')
+    file_logger.info('TwitchLiveCheck version: {}'.format(__version__))
+    file_logger.info('python version: {}'.format(sys.version))
     try:
+      sl_version = subprocess.run(['streamlink', '--version'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
+      file_logger.info(sl_version.stdout)
       twitch_check.run()
     except:
       file_logger.info(twitch_check)
