@@ -339,7 +339,7 @@ class TwitchLiveCheck:
           del self.procs[id]
           self.streamerID.append(id)
           self.stream_quality[id] = self.quality_by_streamer[id]
-          self.print_log(self.logger, 'info', ' {} stream is done. Go back checking...'.format(id), '{} stream is done.'.format(id))
+          self.print_log(self.logger, 'info', ' {} stream is done. Go back checking...'.format(id), '{} stream is done. status: {}'.format(id, proc_code))
           id_status = True
         else:
           # 비정상 종료
