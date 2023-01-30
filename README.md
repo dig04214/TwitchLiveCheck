@@ -23,9 +23,9 @@
 
 
 ## requirements:
-> python 3.6 or later   
+> python 3.9 or later   
 > python requests 5.0.1 or later   
-> streamlink 2.4.0 or later   
+> streamlink 5.0.1 or later   
 
 
 ## Usage:
