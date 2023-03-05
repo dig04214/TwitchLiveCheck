@@ -31,6 +31,7 @@ class TwitchLiveCheck:
 
 #---Do not edit-------------------------------------------------------------------------------------------------------------------
     self.logger = logging.getLogger(name='TwitchLiveCheck')
+    self.timeout = 3.5
 
   def __repr__(self) -> str:
     private_information = ['client_id', 'client_secret', 'user_token', 'download_path', 'pat']
@@ -70,9 +71,12 @@ class TwitchLiveCheck:
       #self.custom_options = self.custom_options.strip().replace(',', '').split(' ')
       self.custom_options = shlex.split(self.custom_options.strip().replace(',', ''), posix=True)
       if '--http-proxy' in self.custom_options:
-        self.legacy_func = True
+        #self.legacy_func = True
         self.streamlink_quality_args.append('--http-proxy')
         self.streamlink_quality_args.append(self.custom_options[self.custom_options.index('--http-proxy') + 1])
+        self.proxies = {'http': self.custom_options[self.custom_options.index('--http-proxy') + 1],
+                        'https': self.custom_options[self.custom_options.index('--http-proxy') + 1]
+                        }
       self.streamlink_args.extend(self.custom_options)
 
   def make_vars(self):
@@ -80,6 +84,7 @@ class TwitchLiveCheck:
     self.procs = dict()
     self.pat = dict()
     self.available_quality = dict()
+    self.proxies = None   # if self.custom_options has '--http-proxy', make_streamlink_args() will change this value
 
   def process_username(self) -> None:
     # change username to lowercase
@@ -116,7 +121,7 @@ class TwitchLiveCheck:
       'grant_type': 'client_credentials',
       'scope': ''
     }
-    res = requests.post(api, json=payload)
+    res = requests.post(api, json=payload, timeout= self.timeout)
     if res.status_code == requests.codes.ok:
       token = res.json()['access_token']
     elif res.status_code == requests.codes.bad_request:
@@ -131,7 +136,7 @@ class TwitchLiveCheck:
   def validate_token(self) -> None:
     api = 'https://id.twitch.tv/oauth2/validate'
     h = {'Authorization': f'Bearer {self.user_token}'}
-    res = requests.get(api, headers=h)
+    res = requests.get(api, headers=h, timeout= self.timeout)
     if res.status_code != requests.codes.ok:
       self.print_log(self.logger, 'info', " invalid access token. regenerate token...", 'regenerate token')
       self.user_token = self.create_token()
@@ -143,7 +148,7 @@ class TwitchLiveCheck:
       'client_id': self.client_id,
       'token': self.user_token
     }
-    res = requests.post(api, json=payload)
+    res = requests.post(api, json=payload, timeout= self.timeout)
     self.print_log(self.logger, 'info', 'app access token revoked')
 
   # create url params
@@ -160,7 +165,7 @@ class TwitchLiveCheck:
       h = {'Authorization': f'Bearer {self.user_token}', 'Client-Id': self.client_id}
       info = dict()
       if self.streamerID != []:
-        res = requests.get(api, headers=h)
+        res = requests.get(api, headers=h, timeout= self.timeout)
 
         # unauthorized : token expired
         if res.status_code == requests.codes.unauthorized:
@@ -195,8 +200,11 @@ class TwitchLiveCheck:
               info[i['user_login']] = {'title': i['title'], 'game': i['game_name']}
               self.streamerID.remove(i['user_login'])
           self.url_params = self.create_params(self.streamerID)
-    except requests.exceptions.ConnectionError as e:
-      self.print_log(self.logger, 'error', " requests.exceptions.ConnectionError. Go back checking...", f'{type(e).__name__}: {e}')
+    except requests.exceptions.ConnectionError as ce:
+      self.print_log(self.logger, 'error', " requests.exceptions.ConnectionError. Go back checking...", f'{type(ce).__name__}: {ce}')
+      info = {}
+    except requests.exceptions.ReadTimeout as rt:
+      self.print_log(self.logger, 'error', " requests.exceptions.ReadTimeout. Go back checking...", f'{type(rt).__name__}: {rt}')
       info = {}
     return info
 
@@ -281,7 +289,7 @@ class TwitchLiveCheck:
           self.pat.pop(id, 0)
 
       if id not in self.pat:
-        playback_token = requests.post(url_gql,json=stream_token_query, headers=twitch_headers)
+        playback_token = requests.post(url_gql,json=stream_token_query, headers=twitch_headers, proxies=self.proxies, timeout= self.timeout)
         if playback_token.status_code != requests.codes.ok:
           self.check_num[id] += 1
           return False
@@ -297,7 +305,7 @@ class TwitchLiveCheck:
             self.legacy_func = True
             pass
       params_usher = {'client_id':'kimne78kx3ncx6brgo4mv6wki5h1ko', 'token': self.pat[id]['token']['value'], 'sig': self.pat[id]['token']['signature'], 'allow_source': True, 'allow_audio_only': True}
-      m3u8_data = requests.get(url_usher, params=params_usher)
+      m3u8_data = requests.get(url_usher, params=params_usher, headers={'user-agent': 'Mozilla/5.0'}, proxies=self.proxies, timeout= self.timeout)
       live_quality = self.quality_parser(m3u8_data.text)
       self.print_log(self.logger, 'info', None, 'Available ttvnw quality of {} : {}'.format(id, live_quality))
 
@@ -502,7 +510,7 @@ def assign_args(args: argparse.Namespace, twitch_check: TwitchLiveCheck) -> Twit
 
 def main(argv) -> None:
   exec_dir = get_exec_dir()
-  __version__ = '0.2.2'
+  __version__ = '0.2.4'
 
   file_logger = logging.getLogger(name='TwitchLiveCheck')
   file_logger.setLevel(logging.INFO)
